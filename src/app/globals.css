@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-brand: #4f46e5;
+  --color-brand-foreground: #ffffff;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
