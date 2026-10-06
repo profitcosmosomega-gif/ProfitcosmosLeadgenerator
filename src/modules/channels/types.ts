@@ -3,8 +3,17 @@
  * Phase 1. Adapters normalize platform payloads so the rest of the system is channel-agnostic.
  */
 
-export type ChannelKind =
-  'web' | 'email' | 'whatsapp' | 'instagram' | 'messenger' | 'sms' | 'tiktok';
+export const CHANNEL_KINDS = [
+  'web',
+  'email',
+  'whatsapp',
+  'instagram',
+  'messenger',
+  'sms',
+  'tiktok',
+] as const;
+
+export type ChannelKind = (typeof CHANNEL_KINDS)[number];
 
 export interface ChannelCapabilities {
   /** Hours after the last inbound message during which free-form replies are allowed. */

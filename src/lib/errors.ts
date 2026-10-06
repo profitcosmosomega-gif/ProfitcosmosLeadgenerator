@@ -6,6 +6,7 @@ export type ErrorCode =
   | 'FORBIDDEN'
   | 'NOT_FOUND'
   | 'CONFLICT'
+  | 'INVALID_STATE_TRANSITION'
   | 'RATE_LIMITED'
   | 'SERVICE_UNAVAILABLE'
   | 'INTERNAL_ERROR';
@@ -16,6 +17,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   FORBIDDEN: 403,
   NOT_FOUND: 404,
   CONFLICT: 409,
+  INVALID_STATE_TRANSITION: 409,
   RATE_LIMITED: 429,
   SERVICE_UNAVAILABLE: 503,
   INTERNAL_ERROR: 500,
@@ -45,7 +47,11 @@ export const Errors = {
   forbidden: (message = 'You do not have permission to perform this action') =>
     new AppError('FORBIDDEN', message),
   notFound: (message = 'Resource not found') => new AppError('NOT_FOUND', message),
-  conflict: (message = 'Resource conflict') => new AppError('CONFLICT', message),
+  conflict: (message = 'Resource conflict', details?: unknown) =>
+    new AppError('CONFLICT', message, details),
+  invalidTransition: (message: string, details?: unknown) =>
+    new AppError('INVALID_STATE_TRANSITION', message, details),
+  rateLimited: (message = 'Too many requests') => new AppError('RATE_LIMITED', message),
   unavailable: (message = 'Service unavailable') => new AppError('SERVICE_UNAVAILABLE', message),
 };
 

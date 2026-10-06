@@ -17,6 +17,19 @@ export const envSchema = z.object({
   // Single-tenant for now: every record belongs to this organization.
   DEFAULT_ORGANIZATION_SLUG: z.string().min(1).default('profitcosmos-omega'),
 
+  // Public lead form: extra origins allowed to post (comma-separated), and per-IP limit per minute.
+  PUBLIC_FORM_ORIGINS: z
+    .string()
+    .default('')
+    .transform((value) =>
+      value
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(z.url())),
+  PUBLIC_FORM_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(10),
+
   EMAIL_PROVIDER: z.enum(['smtp', 'console']).default('console'),
   EMAIL_FROM: z.string().min(3).default('ProfitCosmos Omega <no-reply@localhost>'),
   SMTP_HOST: z.string().default('localhost'),

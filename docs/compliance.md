@@ -59,8 +59,23 @@ conversations. A failed check means the message is not sent and a human is notif
 Analytics never fabricate numbers. When data is missing (e.g. no ad spend), the metric is reported
 as unavailable, not as zero or an estimate.
 
-## Phase 1 status
+## Implementation status
 
-Implemented now: staff authentication with roles, disabled public sign-up, audit log with sign-in
+**Phase 1**: staff authentication with roles, disabled public sign-up, audit log with sign-in
 events, PII log redaction, environment-only secrets, AI kill-switch (`AI_ENABLED=false`), and a
 prompt loader that refuses any prompt not marked `approved` (all prompts are stubs).
+
+**Phase 2**:
+
+- Consent records per channel and purpose with evidence (method, wording version, who recorded
+  it); latest record is current. Withdrawal is recorded the same way.
+- ⚠️ Form consent wording (`config/consent.ts`) is a **placeholder pending legal review**, stored
+  as `approved: false` with every consent until replaced. It is not legal approval of any
+  jurisdiction's requirements.
+- Public form requires confirmation that the person is 18 or older; otherwise nothing is stored.
+- Do-not-contact list (hashed email/phone) blocks re-capture and re-import after erasure.
+- Data-subject export (admin) and erasure (owner) endpoints.
+- Lead timeline and audit entries hold ids and field names only; URLs are stored without query
+  strings; `lead_events` and `stage_transitions` are append-only at database level.
+- Nothing is sent to leads yet: consent is recorded, but no outbound messaging exists until
+  Phase 8, where consent and suppression will be checked at send time.

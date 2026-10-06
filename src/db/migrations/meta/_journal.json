@@ -8,6 +8,20 @@
       "when": 1791304114841,
       "tag": "0000_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791312938102,
+      "tag": "0001_crm",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791312946967,
+      "tag": "0002_append_only_history",
+      "breakpoints": true
     }
   ]
 }
