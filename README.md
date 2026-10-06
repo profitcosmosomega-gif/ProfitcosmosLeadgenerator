@@ -23,8 +23,24 @@ booked consultations and, eventually, enrolled students while reducing manual wo
 | 9     | Analytics dashboard                                         | Planned |
 | 10–12 | Additional channels, campaign automation, multi-tenant SaaS | Planned |
 
-Phase 1 contains **no business features**: no lead capture, AI conversations, scoring, calendar
-or handoff. Prompt files are stubs with TODO placeholders only.
+### Phase 1 boundary
+
+Phase 1 is the foundation only. The following are **intentionally not implemented yet**:
+
+| Not implemented                                        | Planned phase | What exists today                                           |
+| ------------------------------------------------------ | ------------- | ----------------------------------------------------------- |
+| Lead capture (forms, chat widget, lead/CRM tables)     | 2             | Nothing — no lead data is collected or stored               |
+| AI conversations / qualification agent                 | 3             | `LlmProvider` interface (types only); `AI_ENABLED=false`    |
+| Production prompt content                              | 3+            | Versioned stubs with TODO placeholders; loader refuses them |
+| Knowledge base                                         | 4             | Nothing                                                     |
+| Lead scoring                                           | 5             | Ruleset types and band thresholds only, no rules or engine  |
+| Calendar / appointment booking workflow                | 6             | `CalendarProvider` interface (types only)                   |
+| Human sales handoff                                    | 7             | Nothing                                                     |
+| Follow-up automation, outbound messaging               | 8             | `ChannelAdapter` interface; email sender used by no feature |
+| Analytics, additional channels, multi-tenant behaviour | 9–12          | `organization_id` columns only; runs single-tenant          |
+
+What Phase 1 does provide: staff sign-in and roles, an audit log, a health check, the background
+worker, database migrations and seed, provider interfaces, tests, CI and Docker images.
 
 ## Architecture overview
 
@@ -78,6 +94,11 @@ To run everything in containers: `docker compose --profile app up -d --build`.
 
 All variables are validated at startup by [`src/lib/env.ts`](src/lib/env.ts); the process fails
 fast with a list of invalid variables. See [`.env.example`](.env.example) for the full list.
+
+**Secrets**: `.env` is gitignored and must never be committed. `.env.example` contains placeholders
+only: secrets (`BETTER_AUTH_SECRET`, `SEED_OWNER_PASSWORD`, `SMTP_PASSWORD`, `ANTHROPIC_API_KEY`)
+are left empty, and the `postgres:postgres` database credentials match the local Docker Compose
+database only. In production, supply values through the host's secret manager.
 
 | Variable                           | Required | Default                     | Purpose                                 |
 | ---------------------------------- | -------- | --------------------------- | --------------------------------------- |
@@ -154,10 +175,34 @@ CONSULTATION_COMPLETED → ENROLLMENT_PENDING → ENROLLED`, plus `NURTURE` and 
 - **Human handoff**: high-intent or out-of-scope conversations go to a person with a concise brief.
 - **Knowledge base**: the AI answers only from approved content and escalates when it doesn't know.
 
-## Staff roles
+## Staff authentication and roles
 
-`viewer` < `sales` < `admin` < `owner` (hierarchical). Public sign-up is disabled; staff accounts
-are created by the seed script or, in later phases, by an admin.
+Only **staff** sign in. Prospects and students never have accounts in this system.
+
+- **Method**: email + password via [Better Auth](https://www.better-auth.com/) (minimum 12
+  characters, hashed with scrypt). Sessions are stored in Postgres and carried in an HTTP-only
+  cookie (`Secure` in production); they last 7 days and are refreshed daily.
+- **No self-signup**: public sign-up is disabled (`disableSignUp`); the sign-up endpoint rejects
+  every request.
+- **Provisioning**: staff accounts are created deliberately, never by the person themselves. In
+  Phase 1 the only path is `pnpm db:seed`, which creates the organization and its **owner**
+  account from `SEED_OWNER_*` variables. An admin screen for inviting staff comes in a later phase.
+- **Roles are hierarchical**: `viewer` < `sales` < `admin` < `owner`. A higher role can do
+  everything a lower role can. New users default to `viewer`.
+
+| Role     | Intended use                                  | Phase 1 access                  |
+| -------- | --------------------------------------------- | ------------------------------- |
+| `viewer` | Read-only access to dashboards                | Admin shell, `GET /api/v1/me`   |
+| `sales`  | Work leads, handoffs and appointments (later) | Same as viewer                  |
+| `admin`  | Manage configuration, knowledge base, staff   | + `GET /api/v1/admin/audit-log` |
+| `owner`  | Business owner; everything an admin can do    | Same as admin                   |
+
+- **Enforcement**: API routes declare a minimum role with `authedApiHandler(minRole, …)`
+  (`src/lib/api.ts`). No session → `401 UNAUTHENTICATED`; insufficient role →
+  `403 FORBIDDEN`. Admin pages redirect to `/login` without a session.
+- **Audit**: every sign-in is written to `audit_log`.
+- **Brute-force protection**: Better Auth's rate limiter is on in production. It keeps counts in
+  memory, so it applies per server instance.
 
 ## Compliance and data protection
 
