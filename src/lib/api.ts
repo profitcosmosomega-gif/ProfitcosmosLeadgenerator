@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import { newId } from './ids';
 import { toErrorResponse, Errors } from './errors';
 import { logger, type Logger } from './logger';
@@ -83,4 +83,18 @@ export async function parseJson<S extends z.ZodType>(req: Request, schema: S): P
 /** Parse and validate URL search params. */
 export function parseQuery<S extends z.ZodType>(req: Request, schema: S): z.infer<S> {
   return schema.parse(Object.fromEntries(new URL(req.url).searchParams));
+}
+
+/** Read a UUID route parameter. Anything that is not a UUID is treated as "not found". */
+export async function routeId(route: RouteParams, name = 'id'): Promise<string> {
+  const value = (await route.params)[name];
+  if (typeof value !== 'string' || !z.uuid().safeParse(value).success) {
+    throw Errors.notFound();
+  }
+  return value;
+}
+
+/** The acting staff user as a domain `Actor`. */
+export function userActor(ctx: AuthedApiContext) {
+  return { type: 'user' as const, userId: ctx.user.id, requestId: ctx.requestId };
 }

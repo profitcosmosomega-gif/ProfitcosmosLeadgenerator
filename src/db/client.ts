@@ -5,6 +5,10 @@ import { logger } from '../lib/logger';
 import * as schema from './schema';
 
 export type Database = NodePgDatabase<typeof schema>;
+/** A transaction handle, as passed to `db.transaction(async (tx) => …)`. */
+export type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
+/** Anything that can run queries: the database or an open transaction. */
+export type DbExecutor = Database | Transaction;
 
 interface DbState {
   pool: Pool;

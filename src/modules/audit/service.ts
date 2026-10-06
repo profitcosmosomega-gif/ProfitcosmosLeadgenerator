@@ -1,11 +1,11 @@
 import { desc, eq } from 'drizzle-orm';
-import type { Database } from '@/db/client';
+import type { Database, DbExecutor } from '@/db/client';
 import { auditLog, type AuditLogEntry, type NewAuditLogEntry } from '@/db/schema';
 
 export type AuditInput = Omit<NewAuditLogEntry, 'id' | 'createdAt'>;
 
 /** Append an entry to the audit log. Never pass personal data in `metadata`. */
-export async function recordAudit(db: Database, entry: AuditInput): Promise<void> {
+export async function recordAudit(db: DbExecutor, entry: AuditInput): Promise<void> {
   await db.insert(auditLog).values(entry);
 }
 
