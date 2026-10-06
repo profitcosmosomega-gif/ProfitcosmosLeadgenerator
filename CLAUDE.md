@@ -33,6 +33,18 @@ first. Work phase by phase; do not build features from a later phase without app
 - Write to `audit_log` (`recordAudit`) for staff actions that change data.
 - IDs are UUID v7 generated in the app (`newId()`); timestamps are `timestamptz`.
 
+## CRM rules (Phase 2)
+
+- A lead's `stage` changes **only** through `transitionLead` in `src/modules/crm/service.ts`.
+  Never update `leads.stage` anywhere else and never add a bypass.
+- Record lead mutations with `recordLeadHistory` (timeline + audit in the same transaction).
+  Payloads contain ids and field names, never personal values or free text.
+- `lead_events` and `stage_transitions` are append-only (DB triggers); don't try to update them.
+- Every query on CRM tables filters by `organization_id`; load leads with `findLead` /
+  `findMutableLead` so other organizations' leads are a 404.
+- Inbound leads (form, import, future channels) go through `captureLead`: dedupe, fill-only
+  updates, suppression list.
+
 ## Database
 
 - Edit `src/db/schema/*`, then `pnpm db:generate` and commit the SQL in `src/db/migrations`.

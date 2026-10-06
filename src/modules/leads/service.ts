@@ -308,6 +308,14 @@ export async function applyLeadChanges(
     changes.ownerUserId = input.ownerUserId;
   }
 
+  const nextEmail = 'email' in changes ? changes.email : lead.email;
+  const nextPhone = 'phone' in changes ? changes.phone : lead.phone;
+  if (!nextEmail && !nextPhone) {
+    throw Errors.validation('A lead needs an email or a phone number', [
+      { path: ['email'], message: 'Provide an email or a phone number' },
+    ]);
+  }
+
   const fields = Object.keys(changes);
   if (fields.length > 0) {
     try {

@@ -13,7 +13,7 @@ booked consultations and, eventually, enrolled students while reducing manual wo
 | Phase | Scope                                                       | Status  |
 | ----- | ----------------------------------------------------------- | ------- |
 | 1     | Architecture and repository foundation                      | ✅ Done |
-| 2     | Lead database and CRM                                       | Planned |
+| 2     | Lead database and CRM                                       | ✅ Done |
 | 3     | AI qualification agent                                      | Planned |
 | 4     | Knowledge base                                              | Planned |
 | 5     | Lead scoring                                                | Planned |
@@ -23,24 +23,26 @@ booked consultations and, eventually, enrolled students while reducing manual wo
 | 9     | Analytics dashboard                                         | Planned |
 | 10–12 | Additional channels, campaign automation, multi-tenant SaaS | Planned |
 
-### Phase 1 boundary
+### Current boundary (Phases 1–2 implemented)
 
-Phase 1 is the foundation only. The following are **intentionally not implemented yet**:
+**Implemented**: staff sign-in and roles, audit log, health check, background worker, migrations
+and seed, provider interfaces, **the lead database and CRM** (see
+[Lead database and CRM](#lead-database-and-crm-phase-2)), tests, CI and Docker images.
 
-| Not implemented                                        | Planned phase | What exists today                                           |
-| ------------------------------------------------------ | ------------- | ----------------------------------------------------------- |
-| Lead capture (forms, chat widget, lead/CRM tables)     | 2             | Nothing — no lead data is collected or stored               |
-| AI conversations / qualification agent                 | 3             | `LlmProvider` interface (types only); `AI_ENABLED=false`    |
-| Production prompt content                              | 3+            | Versioned stubs with TODO placeholders; loader refuses them |
-| Knowledge base                                         | 4             | Nothing                                                     |
-| Lead scoring                                           | 5             | Ruleset types and band thresholds only, no rules or engine  |
-| Calendar / appointment booking workflow                | 6             | `CalendarProvider` interface (types only)                   |
-| Human sales handoff                                    | 7             | Nothing                                                     |
-| Follow-up automation, outbound messaging               | 8             | `ChannelAdapter` interface; email sender used by no feature |
-| Analytics, additional channels, multi-tenant behaviour | 9–12          | `organization_id` columns only; runs single-tenant          |
+The following are **intentionally not implemented yet**:
 
-What Phase 1 does provide: staff sign-in and roles, an audit log, a health check, the background
-worker, database migrations and seed, provider interfaces, tests, CI and Docker images.
+| Not implemented                                     | Planned phase | What exists today                                             |
+| --------------------------------------------------- | ------------- | ------------------------------------------------------------- |
+| AI conversations / qualification agent, chat widget | 3             | `LlmProvider` interface (types only); `AI_ENABLED=false`      |
+| Production prompt content                           | 3+            | Versioned stubs with TODO placeholders; loader refuses them   |
+| Knowledge base                                      | 4             | Nothing                                                       |
+| Lead scoring                                        | 5             | Ruleset types and band thresholds only; "qualified" is manual |
+| Calendar / appointment booking workflow             | 6             | `CalendarProvider` interface (types only)                     |
+| Human sales handoff                                 | 7             | Nothing                                                       |
+| Follow-up automation, outbound messaging            | 8             | `ChannelAdapter` interface; nothing is ever sent to leads     |
+| Analytics dashboard, ad-spend import                | 9             | Attribution data is captured; no reports                      |
+| Additional channels (WhatsApp, Instagram, …)        | 10            | `channel_identities` table and link/resolve service only      |
+| Multi-tenant behaviour (tenant UI, RLS)             | 12            | `organization_id` on every table; runs single-tenant          |
 
 ## Architecture overview
 
@@ -100,19 +102,21 @@ only: secrets (`BETTER_AUTH_SECRET`, `SEED_OWNER_PASSWORD`, `SMTP_PASSWORD`, `AN
 are left empty, and the `postgres:postgres` database credentials match the local Docker Compose
 database only. In production, supply values through the host's secret manager.
 
-| Variable                           | Required | Default                     | Purpose                                 |
-| ---------------------------------- | -------- | --------------------------- | --------------------------------------- |
-| `DATABASE_URL`                     | yes      | —                           | Postgres connection string              |
-| `BETTER_AUTH_SECRET`               | yes      | —                           | Session signing secret (≥ 32 chars)     |
-| `APP_URL`                          | no       | `http://localhost:3000`     | Public base URL (auth, trusted origin)  |
-| `LOG_LEVEL`                        | no       | `info`                      | pino log level                          |
-| `DEFAULT_ORGANIZATION_SLUG`        | no       | `profitcosmos-omega`        | The single tenant                       |
-| `EMAIL_PROVIDER`                   | no       | `console`                   | `console` (log only) or `smtp`          |
-| `EMAIL_FROM`, `SMTP_*`             | no       | Mailpit on `localhost:1025` | Outbound email                          |
-| `AI_ENABLED`                       | no       | `false`                     | AI kill-switch (unused in Phase 1)      |
-| `ANTHROPIC_API_KEY`, `LLM_MODEL_*` | no       | —                           | Reserved for Phase 3                    |
-| `SEED_OWNER_EMAIL` / `_PASSWORD`   | seed     | —                           | Owner account created by `pnpm db:seed` |
-| `TEST_DATABASE_URL`                | tests    | `…/profitcosmos_test`       | Database the test suite **resets**      |
+| Variable                            | Required | Default                     | Purpose                                 |
+| ----------------------------------- | -------- | --------------------------- | --------------------------------------- |
+| `DATABASE_URL`                      | yes      | —                           | Postgres connection string              |
+| `BETTER_AUTH_SECRET`                | yes      | —                           | Session signing secret (≥ 32 chars)     |
+| `APP_URL`                           | no       | `http://localhost:3000`     | Public base URL (auth, trusted origin)  |
+| `LOG_LEVEL`                         | no       | `info`                      | pino log level                          |
+| `DEFAULT_ORGANIZATION_SLUG`         | no       | `profitcosmos-omega`        | The single tenant                       |
+| `PUBLIC_FORM_ORIGINS`               | no       | — (only `APP_URL`)          | Extra origins allowed to post the form  |
+| `PUBLIC_FORM_RATE_LIMIT_PER_MINUTE` | no       | `10`                        | Public form submissions per IP / minute |
+| `EMAIL_PROVIDER`                    | no       | `console`                   | `console` (log only) or `smtp`          |
+| `EMAIL_FROM`, `SMTP_*`              | no       | Mailpit on `localhost:1025` | Outbound email                          |
+| `AI_ENABLED`                        | no       | `false`                     | AI kill-switch (unused in Phase 1)      |
+| `ANTHROPIC_API_KEY`, `LLM_MODEL_*`  | no       | —                           | Reserved for Phase 3                    |
+| `SEED_OWNER_EMAIL` / `_PASSWORD`    | seed     | —                           | Owner account created by `pnpm db:seed` |
+| `TEST_DATABASE_URL`                 | tests    | `…/profitcosmos_test`       | Database the test suite **resets**      |
 
 ## Project structure
 
@@ -120,17 +124,20 @@ database only. In production, supply values through the host's secret manager.
 src/
   app/                 Next.js routes
     (auth)/login       staff sign-in page
-    (admin)/admin      protected admin shell
+    (admin)/admin      protected admin: leads list, lead detail, CSV import
     api/auth/[...all]  Better Auth endpoints
     api/health         health check (database + queue)
-    api/v1/            versioned REST API (me, admin/audit-log)
+    api/public/leads   public lead-capture endpoint for website forms
+    api/v1/            versioned staff REST API (me, leads, imports, admin/audit-log)
   db/                  Drizzle client, schema, migrations, migrate + seed logic
   lib/                 env, logger, errors, api handler, auth, session, rbac, queue, prompts
-  modules/             domain modules (audit, organizations, health, channels contract)
+  modules/             domain modules: leads, crm (stage transitions), consents, attribution,
+                       imports, channels (contract + identities), audit, organizations, staff, health
   providers/           external-service contracts and adapters (llm, calendar, email)
   worker/              pg-boss worker, job registry, jobs
 config/
-  pipeline.ts          CRM stage names (transitions: Phase 2)
+  pipeline.ts          CRM stages and allowed transitions
+  consent.ts           consent wording shown on forms (PLACEHOLDER, pending legal review)
   scoring/             scoring ruleset shapes and bands (rules: Phase 5)
   prompts/             versioned prompt stubs + registry (no production text)
 scripts/               migrate / seed entrypoints
@@ -158,22 +165,88 @@ docs/                  architecture plan, ADRs, compliance
 ## Testing strategy
 
 - **Unit tests** (`tests/unit`): pure logic — env validation, error mapping, RBAC, API handler,
-  email provider, prompt registry guards.
+  email provider, prompt registry guards, phone/email normalisation, CSV parsing, pipeline table,
+  rate limiter, log redaction.
 - **Integration tests** (`tests/integration`): real Postgres. The test database named by
   `TEST_DATABASE_URL` is **dropped and re-migrated** at the start of each run (the setup refuses any
-  database whose name does not contain `test`). Covers health, seed, auth (401/403), audit log and
-  the worker runtime.
+  database whose name does not contain `test`). Covers health, seed, auth (401/403), audit log, the
+  worker runtime and the CRM: role permissions per route, cross-organization isolation, stage
+  transitions, append-only history, public capture, CSV import, merge, export and erasure.
 - **AI evaluations** (`tests/evals`): arrive with the AI agent in Phase 3.
 
 ## Domain concepts
 
 - **Funnel stages**: `NEW_LEAD → ENGAGED → QUALIFYING → QUALIFIED → CONSULTATION_BOOKED →
 CONSULTATION_COMPLETED → ENROLLMENT_PENDING → ENROLLED`, plus `NURTURE` and `LOST`
-  ([config/pipeline.ts](config/pipeline.ts)).
+  ([config/pipeline.ts](config/pipeline.ts)). See [Lead database and CRM](#lead-database-and-crm-phase-2).
 - **Lead scoring**: explainable 0–100 score from deterministic, versioned rules; the AI extracts
   signals, it never decides the score. Bands: 0–39 Nurture, 40–69 Interested, 70–100 High intent.
 - **Human handoff**: high-intent or out-of-scope conversations go to a person with a concise brief.
 - **Knowledge base**: the AI answers only from approved content and escalates when it doesn't know.
+
+## Lead database and CRM (Phase 2)
+
+**Leads** hold contact details (email lower-cased, phone in E.164 international format),
+qualification answers, pipeline stage, owner and attribution. One active lead per email and per
+phone number per organization. New leads start at `NEW_LEAD` and are **unassigned** until staff
+assign an owner. "Qualified" is a manual staff decision until scoring arrives in Phase 5.
+
+**Pipeline**: the only way to change a stage is the transition service
+(`src/modules/crm/service.ts`, `POST /api/v1/leads/:id/transition`). It checks the move against the
+table in [`config/pipeline.ts`](config/pipeline.ts), requires a reason for `LOST` and `NURTURE`, and
+writes the stage, a `stage_transitions` row, a timeline event and an audit entry in one
+transaction. There is no override; invalid moves return `409 INVALID_STATE_TRANSITION`.
+
+**History**: every change is recorded on the lead's timeline (`lead_events`) and in `audit_log`.
+Both store ids and changed field names only, never names, emails, phone numbers or note text.
+`lead_events` and `stage_transitions` are append-only (database triggers block updates and
+deletes).
+
+**Lead sources**
+
+- **Website / landing-page form** → `POST /api/public/leads` (no login). Requires `email`,
+  `ageConfirmed18plus: true` and `consent.wordingVersion` matching [`config/consent.ts`](config/consent.ts);
+  optional name, phone, country, experience, markets, marketing consents (email / SMS / WhatsApp)
+  and `attribution` (UTM fields, landing page, referrer, click ids). Protected by an origin
+  allow-list (`APP_URL` + `PUBLIC_FORM_ORIGINS`, with CORS), a per-IP rate limit, a hidden
+  `website` honeypot field and strict validation. It always answers `202`, so it never reveals
+  whether an email is already known. Submitting again updates the existing lead: empty fields are
+  filled, staff edits are never overwritten, and a new touchpoint is added.
+- **CSV import** (admin) → `/admin/leads/import` or `POST /api/v1/imports`. Preview (dry run)
+  first; the preview runs the real import inside a rolled-back transaction, so it matches exactly.
+- **By hand** (sales and above).
+
+**Consent**: recorded per channel (email, SMS, WhatsApp, phone) and purpose (transactional,
+marketing) with evidence (method, wording version, who recorded it). The latest record is the
+current state. ⚠️ The consent wording in `config/consent.ts` is a **placeholder marked for legal
+review**; it is stored with `approved: false` on every consent record until replaced.
+
+**Data-subject requests**: admins can export everything stored about a lead as JSON. The owner can
+erase a lead's personal data: contact details, free-text answers, notes, consents and channel
+identities are removed, and the email/phone hashes are added to the do-not-contact list so the
+person is never re-imported or re-captured. Anonymous stage history is kept.
+
+**Duplicates**: admins can merge a duplicate into another lead; missing details and answers are
+copied, notes/consents/touchpoints move over, and both histories stay visible on the target.
+
+| Endpoint                            | Min. role | Purpose                            |
+| ----------------------------------- | --------- | ---------------------------------- |
+| `POST /api/public/leads`            | public    | Website form capture               |
+| `GET /api/v1/leads`                 | viewer    | List / filter / search             |
+| `POST /api/v1/leads`                | sales     | Create                             |
+| `GET /api/v1/leads/:id`             | viewer    | Detail                             |
+| `PATCH /api/v1/leads/:id`           | sales     | Edit contact, owner, qualification |
+| `GET /api/v1/leads/:id/timeline`    | viewer    | Timeline                           |
+| `POST /api/v1/leads/:id/transition` | sales     | Change stage                       |
+| `POST /api/v1/leads/:id/notes`      | sales     | Add note                           |
+| `POST /api/v1/leads/:id/consents`   | sales     | Record consent given / withdrawn   |
+| `POST /api/v1/leads/merge`          | admin     | Merge duplicates                   |
+| `POST /api/v1/imports`              | admin     | CSV import (dry run by default)    |
+| `GET /api/v1/leads/:id/export`      | admin     | Export a lead's data               |
+| `DELETE /api/v1/leads/:id`          | owner     | Erase a lead's personal data       |
+
+Every staff route is scoped to the signed-in user's organization; a lead in another organization
+is reported as `404`.
 
 ## Staff authentication and roles
 
@@ -185,17 +258,17 @@ Only **staff** sign in. Prospects and students never have accounts in this syste
 - **No self-signup**: public sign-up is disabled (`disableSignUp`); the sign-up endpoint rejects
   every request.
 - **Provisioning**: staff accounts are created deliberately, never by the person themselves. In
-  Phase 1 the only path is `pnpm db:seed`, which creates the organization and its **owner**
+  Phases 1–2 the only path is `pnpm db:seed`, which creates the organization and its **owner**
   account from `SEED_OWNER_*` variables. An admin screen for inviting staff comes in a later phase.
 - **Roles are hierarchical**: `viewer` < `sales` < `admin` < `owner`. A higher role can do
   everything a lower role can. New users default to `viewer`.
 
-| Role     | Intended use                                  | Phase 1 access                  |
-| -------- | --------------------------------------------- | ------------------------------- |
-| `viewer` | Read-only access to dashboards                | Admin shell, `GET /api/v1/me`   |
-| `sales`  | Work leads, handoffs and appointments (later) | Same as viewer                  |
-| `admin`  | Manage configuration, knowledge base, staff   | + `GET /api/v1/admin/audit-log` |
-| `owner`  | Business owner; everything an admin can do    | Same as admin                   |
+| Role     | Intended use                               | Access today                                                    |
+| -------- | ------------------------------------------ | --------------------------------------------------------------- |
+| `viewer` | Read-only access                           | View leads, lead detail and timelines                           |
+| `sales`  | Work leads (handoffs, appointments later)  | + create/edit leads, change stage, add notes, record consent    |
+| `admin`  | Manage data, configuration and staff       | + CSV import, merge duplicates, export a lead's data, audit log |
+| `owner`  | Business owner; everything an admin can do | + erase a lead's personal data                                  |
 
 - **Enforcement**: API routes declare a minimum role with `authedApiHandler(minRole, …)`
   (`src/lib/api.ts`). No session → `401 UNAUTHENTICATED`; insufficient role →

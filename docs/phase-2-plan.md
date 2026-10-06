@@ -1,7 +1,7 @@
 # Phase 2 plan — Lead database and CRM
 
-> Status: **PROPOSAL, awaiting approval.** No Phase 2 code exists yet. Implementation starts after
-> the questions in §9 are answered (or the listed defaults are accepted).
+> Status: **IMPLEMENTED** (PR #3). Approved with the §7 defaults and the orchestrator's
+> adjustments; see §10 for the decisions taken during implementation.
 
 ## 1. Goal
 
@@ -182,3 +182,35 @@ Answer by number; anything left unanswered uses the default in §7.
    allowed?
 9. **Consent text**: do you have approved consent wording for the form, or should I use a clearly
    marked placeholder for legal review?
+
+## 10. Implementation decisions and deviations
+
+Approved adjustments applied: §7 defaults used for every §9 question; consent wording is a
+placeholder flagged `approved: false`; "qualified" stays manual; new leads are unassigned (no
+round-robin); the transition table is exactly as in §4 with **no admin override**; erasure is
+owner-only. Channel identities were added from Issue #2.
+
+Decisions made while building, for review:
+
+1. **Under-18 form submissions are rejected, not stored.** The public form requires
+   `ageConfirmed18plus: true`; anything else is a validation error and nothing is saved (data
+   minimisation). Staff can still move an existing lead to `LOST` with reason "underage".
+2. **CSV columns are matched by header name** (with common aliases such as `utm_source`,
+   `email_address`) instead of an interactive column-mapping screen. Unknown columns are listed and
+   ignored. The preview runs the real import in a rolled-back transaction, so it always matches.
+3. **Notes live in `lead_notes`**, not in the timeline payload, so the timeline stays append-only
+   and free of personal data, and erasure can delete note text.
+4. **Timeline and audit payloads hold ids and field names only** — never values of personal fields.
+5. **Phone numbers must be in international format** (`+44…` or `0044…`); numbers without a
+   country code are rejected rather than guessed. No phone-parsing library was added.
+6. **Suppression list stores unsalted SHA-256 hashes** of the normalised email/phone. Good enough
+   to block re-contact without keeping the value; not resistant to a dictionary attack by someone
+   with database access.
+7. **Public-form rate limit is in memory per server instance** (default 10/minute/IP).
+8. **Staff users referenced by history cannot be hard-deleted** (`lead_events` and
+   `stage_transitions` reference users without cascade, because those tables are append-only).
+   Staff removal will be a deactivation feature later.
+9. **Fields for later phases were not added** (`current_score`, `ai_paused`,
+   `conversation_summary`, appointments, handoffs).
+10. **New typed error codes**: `INVALID_STATE_TRANSITION` (409) and `RATE_LIMITED` (429), in the
+    existing error envelope.

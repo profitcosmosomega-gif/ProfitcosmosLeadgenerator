@@ -1,6 +1,6 @@
 import { CURRENT_CONSENT_WORDING } from '@config/consent';
 import { getDb } from '@/db/client';
-import { apiHandler, json, parseJson } from '@/lib/api';
+import { apiHandler, json } from '@/lib/api';
 import { getEnv } from '@/lib/env';
 import { Errors } from '@/lib/errors';
 import { publicFormLimiter } from '@/lib/rate-limit';
@@ -39,11 +39,16 @@ const handle = apiHandler(async (req, { requestId }) => {
   if (!publicFormLimiter().take(`public-leads:${clientIp(req)}`)) {
     throw Errors.rateLimited();
   }
-  if (Number(req.headers.get('content-length') ?? 0) > MAX_BODY_BYTES) {
-    throw Errors.validation('Request body too large');
+  // Enforce the size limit on the bytes actually received, not just the declared length.
+  const raw = await req.text();
+  if (Buffer.byteLength(raw) > MAX_BODY_BYTES) throw Errors.validation('Request body too large');
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    throw Errors.validation('Request body must be valid JSON');
   }
-
-  const input = await parseJson(req, publicLeadInput);
+  const input = publicLeadInput.parse(body);
   // Same response either way, so the endpoint never reveals whether an email is known.
   const accepted = () => json({ status: 'received' }, { status: 202 });
   if (input.website) return accepted(); // honeypot tripped

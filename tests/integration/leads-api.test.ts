@@ -182,6 +182,18 @@ describe('update', () => {
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
+  it('refuses to remove the last contact detail', async () => {
+    const created = await createAs('sales@example.test', newLead('lastcontact'));
+    const res = await call(leadRoute.PATCH, '/api/v1/leads/x', {
+      method: 'PATCH',
+      headers: await as('sales@example.test'),
+      params: { id: created.body.data.id },
+      body: { email: null },
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
   it('rejects an owner from another organization', async () => {
     const created = await createAs('sales@example.test', newLead('badowner'));
     const otherOwner = (await createStaff('sales', orgB, 'b-')).id;

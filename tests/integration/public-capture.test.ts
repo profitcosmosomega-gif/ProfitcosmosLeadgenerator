@@ -149,6 +149,21 @@ describe('public lead form', () => {
     expect(await leadByEmail(email)).toBeUndefined();
   });
 
+  it('rejects oversized and malformed bodies', async () => {
+    const big = await submit(form({ email: 'big@example.test', fullName: 'x'.repeat(20_000) }));
+    expect(big.status).toBe(400);
+    const res = await publicRoute.POST(
+      new Request('http://localhost/api/public/leads', {
+        method: 'POST',
+        headers: { 'x-forwarded-for': '203.0.113.9', 'content-type': 'application/json' },
+        body: '{not json',
+      }),
+      { params: Promise.resolve({}) },
+    );
+    expect(res.status).toBe(400);
+    expect(await leadByEmail('big@example.test')).toBeUndefined();
+  });
+
   it('rate-limits per IP', async () => {
     const headers = { 'x-forwarded-for': '192.0.2.50' };
     const statuses: number[] = [];
