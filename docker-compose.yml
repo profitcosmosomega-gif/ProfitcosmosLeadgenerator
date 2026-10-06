@@ -1,0 +1,62 @@
+# Local development services.
+#   docker compose up -d                  -> Postgres + Mailpit
+#   docker compose --profile app up -d    -> also builds and runs web + worker containers
+services:
+  postgres:
+    # pgvector-enabled Postgres 16 (vector search is planned for a later phase).
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: profitcosmos
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - '1025:1025' # SMTP
+      - '8025:8025' # Web UI
+
+  migrate:
+    profiles: ['app']
+    build: { context: ., target: worker }
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/profitcosmos
+    command: ['node', '--import', 'tsx', 'scripts/migrate.ts']
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  web:
+    profiles: ['app']
+    build: { context: ., target: web }
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/profitcosmos
+      SMTP_HOST: mailpit
+    ports:
+      - '3000:3000'
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  worker:
+    profiles: ['app']
+    build: { context: ., target: worker }
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/profitcosmos
+      SMTP_HOST: mailpit
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+volumes:
+  postgres-data:
