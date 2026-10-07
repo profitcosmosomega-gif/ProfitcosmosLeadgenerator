@@ -45,9 +45,11 @@ import {
 import {
   accountUsage,
   countLeadTurnsSince,
+  organizationCostSince,
   organizationTokensSince,
   recordAiRun,
   startOfUtcDay,
+  startOfUtcMonth,
 } from './runs';
 import {
   agentTools,
@@ -77,6 +79,8 @@ export interface AgentDeps {
   /** The fixed chat texts are approved (`config/chat-copy.ts`); the AI does not run otherwise. */
   copyApproved: boolean;
   dailyTokenLimit: number;
+  /** Monthly AI spend ceiling in micro-dollars (founder budget). */
+  monthlyBudgetMicroUsd: number;
   now?: () => Date;
 }
 
@@ -88,6 +92,7 @@ export function defaultAgentDeps(): AgentDeps {
     aiEnabled: env.AI_ENABLED,
     copyApproved: chatCopy.approved,
     dailyTokenLimit: env.AI_DAILY_TOKEN_LIMIT,
+    monthlyBudgetMicroUsd: Math.round(env.AI_MONTHLY_BUDGET_USD * 1_000_000),
   };
 }
 
@@ -232,6 +237,12 @@ async function evaluateGate(
     deps.dailyTokenLimit
   ) {
     return { gate: { code: 'org_daily_budget', escalate: 'limit_reached' } };
+  }
+  if (
+    (await organizationCostSince(db, lead.organizationId, startOfUtcMonth(now))) >=
+    deps.monthlyBudgetMicroUsd
+  ) {
+    return { gate: { code: 'org_monthly_budget', escalate: 'limit_reached' } };
   }
   return { gate: null, prompts };
 }
@@ -530,6 +541,7 @@ function stateContext(
     `Known from the team or forms (do not ask again): ${snapshot.knownElsewhere.join(', ') || 'none'}`,
     `Collected in this chat: ${JSON.stringify(snapshot.collected)}`,
     `Still missing, most useful first: ${snapshot.missing.join(', ') || 'none'}`,
+    `Location (country) known: ${context.contactKnown.country || effects.contact.country ? 'yes' : 'no, ask'}`,
     `Prospect messages so far: ${context.leadMessages.length}`,
     '</conversation_state>',
   ];

@@ -16,16 +16,17 @@ export const aiConfig = {
   maxToolRounds: 3,
   /** Messages of history sent to the model. */
   historyMessages: 20,
-  /** Output token caps (reasoning counts towards them) for a reply and for a guardrail verdict. */
-  maxReplyTokens: 8_000,
-  maxGuardrailTokens: 4_000,
+  /** Output token caps for a reply (two or three sentences) and for a guardrail verdict. */
+  maxReplyTokens: 1_000,
+  maxGuardrailTokens: 500,
   /** Worker lease on a conversation while a turn runs. */
   turnLeaseSeconds: 120,
 } as const;
 
 /**
- * Prices in US dollars per million tokens, for cost accounting in `ai_runs`.
- * A model missing here records cost as null (unknown), never as zero.
+ * Prices in US dollars per million tokens, for cost accounting in `ai_runs`. Dated model ids
+ * (e.g. `claude-haiku-4-5-20251001`) use the price of their alias. A model missing here records
+ * cost as null (unknown), never as zero.
  */
 export const llmPricing: Record<
   string,

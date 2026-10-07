@@ -17,6 +17,7 @@ export function testDeps(llm: LlmProvider | null, overrides: Partial<AgentDeps> 
     aiEnabled: true,
     copyApproved: true,
     dailyTokenLimit: 10_000_000,
+    monthlyBudgetMicroUsd: 1_000_000_000,
     ...overrides,
   };
 }

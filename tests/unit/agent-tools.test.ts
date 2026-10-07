@@ -136,6 +136,10 @@ describe('cost accounting', () => {
       1000 * 4 + 100 * 20,
     );
     expect(costMicroUsd('mystery-model', { inputTokens: 10, outputTokens: 10 })).toBeNull();
+    // Dated ids returned by the API use their alias's price.
+    expect(
+      costMicroUsd('claude-haiku-4-5-20251001', { inputTokens: 1000, outputTokens: 100 }),
+    ).toBe(1000 * 1 + 100 * 5);
   });
   it('rejects malformed usage', () => {
     expect(() => accountUsage('claude-opus-5-5', { inputTokens: -1, outputTokens: 0 })).toThrow();

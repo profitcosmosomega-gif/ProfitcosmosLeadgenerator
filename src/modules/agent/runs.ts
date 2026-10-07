@@ -9,9 +9,14 @@ import type { LlmUsage } from '@/providers/llm/types';
  * Cost of one call in millionths of a US dollar, or null when the model's price is unknown.
  * Never estimated: an unknown price stays unknown.
  */
+/** Price for a model id or its dated variant (`<alias>-YYYYMMDD`). */
+export function priceFor(model: string) {
+  return llmPricing[model] ?? llmPricing[model.replace(/-\d{8}$/, '')] ?? null;
+}
+
 export function costMicroUsd(model: string | null | undefined, usage: LlmUsage): number | null {
   if (!model) return null;
-  const price = llmPricing[model];
+  const price = priceFor(model);
   if (!price) return null;
   const micro =
     usage.inputTokens * price.input +
@@ -91,4 +96,21 @@ export async function organizationTokensSince(
 
 export function startOfUtcDay(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
+/** Recorded AI cost of the organisation since a time, in micro-dollars (unknown costs excluded). */
+export async function organizationCostSince(
+  db: DbExecutor,
+  organizationId: string,
+  since: Date,
+): Promise<number> {
+  const [row] = await db
+    .select({ total: sql<number>`coalesce(sum(${aiRuns.costMicroUsd}), 0)::bigint` })
+    .from(aiRuns)
+    .where(and(eq(aiRuns.organizationId, organizationId), gte(aiRuns.createdAt, since)));
+  return Number(row?.total ?? 0);
+}
+
+export function startOfUtcMonth(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }

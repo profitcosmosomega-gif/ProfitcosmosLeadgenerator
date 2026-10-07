@@ -16,7 +16,9 @@ chat texts. This file is the gate; nothing in code or CI approves anything.
 Version 1.1.0 incorporates the founder's answers of 2026-10-07 to business questions 1 (Canada
 first, no jurisdiction-specific claims, outside Canada the team confirms), 2 (AI identity,
 education not advice, risk and no guarantee), 13 (name "ProfitCosmos Omega AI Assistant", voice,
-AI disclosure in the first message) and 14 (always-escalate topics). Version 1.0.0 is retired.
+AI disclosure in the first message) and 14 (always-escalate topics), plus 6 (initial
+qualification criteria) and 7 (consultations arranged by the team, never booked in the chat).
+Version 1.0.0 is retired.
 
 ## How the gate is enforced
 

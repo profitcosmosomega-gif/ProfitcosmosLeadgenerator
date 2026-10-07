@@ -107,24 +107,25 @@ only: secrets (`BETTER_AUTH_SECRET`, `SEED_OWNER_PASSWORD`, `SMTP_PASSWORD`, `AN
 are left empty, and the `postgres:postgres` database credentials match the local Docker Compose
 database only. In production, supply values through the host's secret manager.
 
-| Variable                            | Required | Default                     | Purpose                                 |
-| ----------------------------------- | -------- | --------------------------- | --------------------------------------- |
-| `DATABASE_URL`                      | yes      | —                           | Postgres connection string              |
-| `BETTER_AUTH_SECRET`                | yes      | —                           | Session signing secret (≥ 32 chars)     |
-| `APP_URL`                           | no       | `http://localhost:3000`     | Public base URL (auth, trusted origin)  |
-| `LOG_LEVEL`                         | no       | `info`                      | pino log level                          |
-| `DEFAULT_ORGANIZATION_SLUG`         | no       | `profitcosmos-omega`        | The single tenant                       |
-| `PUBLIC_FORM_ORIGINS`               | no       | — (only `APP_URL`)          | Extra origins allowed to post the form  |
-| `PUBLIC_FORM_RATE_LIMIT_PER_MINUTE` | no       | `10`                        | Public form submissions per IP / minute |
-| `EMAIL_PROVIDER`                    | no       | `console`                   | `console` (log only) or `smtp`          |
-| `EMAIL_FROM`, `SMTP_*`              | no       | Mailpit on `localhost:1025` | Outbound email                          |
-| `AI_ENABLED`                        | no       | `false`                     | AI kill-switch: no model call when off  |
-| `ANTHROPIC_API_KEY`                 | no       | —                           | Claude API key (AI stays off without)   |
-| `LLM_MODEL_CONVERSATION`            | no       | `claude-opus-5-5`           | Model for agent replies                 |
-| `LLM_MODEL_EXTRACTION`              | no       | `claude-sonnet-5-5`         | Model for the output classifier         |
-| `AI_DAILY_TOKEN_LIMIT`              | no       | `500000`                    | Organization-wide tokens per UTC day    |
-| `SEED_OWNER_EMAIL` / `_PASSWORD`    | seed     | —                           | Owner account created by `pnpm db:seed` |
-| `TEST_DATABASE_URL`                 | tests    | `…/profitcosmos_test`       | Database the test suite **resets**      |
+| Variable                            | Required | Default                     | Purpose                                          |
+| ----------------------------------- | -------- | --------------------------- | ------------------------------------------------ |
+| `DATABASE_URL`                      | yes      | —                           | Postgres connection string                       |
+| `BETTER_AUTH_SECRET`                | yes      | —                           | Session signing secret (≥ 32 chars)              |
+| `APP_URL`                           | no       | `http://localhost:3000`     | Public base URL (auth, trusted origin)           |
+| `LOG_LEVEL`                         | no       | `info`                      | pino log level                                   |
+| `DEFAULT_ORGANIZATION_SLUG`         | no       | `profitcosmos-omega`        | The single tenant                                |
+| `PUBLIC_FORM_ORIGINS`               | no       | — (only `APP_URL`)          | Extra origins allowed to post the form           |
+| `PUBLIC_FORM_RATE_LIMIT_PER_MINUTE` | no       | `10`                        | Public form submissions per IP / minute          |
+| `EMAIL_PROVIDER`                    | no       | `console`                   | `console` (log only) or `smtp`                   |
+| `EMAIL_FROM`, `SMTP_*`              | no       | Mailpit on `localhost:1025` | Outbound email                                   |
+| `AI_ENABLED`                        | no       | `false`                     | AI kill-switch: no model call when off           |
+| `ANTHROPIC_API_KEY`                 | no       | —                           | Claude API key (AI stays off without)            |
+| `LLM_MODEL_CONVERSATION`            | no       | `claude-haiku-4-5`          | Model for agent replies (low cost)               |
+| `LLM_MODEL_EXTRACTION`              | no       | `claude-haiku-4-5`          | Model for the output classifier                  |
+| `AI_DAILY_TOKEN_LIMIT`              | no       | `200000`                    | Organization-wide tokens per UTC day             |
+| `AI_MONTHLY_BUDGET_USD`             | no       | `15`                        | Organization-wide recorded AI cost per UTC month |
+| `SEED_OWNER_EMAIL` / `_PASSWORD`    | seed     | —                           | Owner account created by `pnpm db:seed`          |
+| `TEST_DATABASE_URL`                 | tests    | `…/profitcosmos_test`       | Database the test suite **resets**               |
 
 ## Project structure
 
@@ -307,6 +308,19 @@ and risk statements, English/French mirroring, and the always-escalate topics. T
 (refunds, cancellations, payments, discounts, complaints, disputes, legal/tax, personal advice or
 account situations, privacy, security, human requests) are also detected in code and flag the
 conversation before any model call.
+
+**Cost** (founder budget: 50 CAD/month for hosting and AI together): both model slots default to
+Claude Haiku 4.5, replies are capped at 1,000 output tokens, and the AI stops (flagging the
+conversation) when the organization reaches `AI_DAILY_TOKEN_LIMIT` tokens in a day or
+`AI_MONTHLY_BUDGET_USD` of recorded cost in a month. Every call's tokens and cost are on its
+`ai_runs` row. Rough estimate, not a quote: about 1 US cent per answered message, so the default
+monthly cap covers on the order of 1,500 replies.
+
+**Qualification and consultations**: the assistant gathers the founder's initial criteria
+(Canada location, interest, availability for a consultation; 18+ is confirmed by the pre-chat
+form), asks when something is unknown, and never says a prospect qualifies. It never proposes a
+consultation time; `config/consultations.ts` holds the schedule for Phase 6 booking. Hand-overs
+are recorded and flagged only; email notifications come in a later phase.
 
 **Go-live**: follow [docs/prompt-approval.md](docs/prompt-approval.md). Prompts and chat copy
 stay unapproved until the owner signs off there; approval does not replace legal review.

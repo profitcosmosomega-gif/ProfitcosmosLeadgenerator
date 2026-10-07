@@ -142,15 +142,16 @@ Suspected injection is recorded on the AI run (flag only); the guardrails above 
 
 `config/ai.ts` (code defaults, reviewable):
 
-| Setting                            | Default                           |
-| ---------------------------------- | --------------------------------- |
-| Max characters per lead message    | 2,000                             |
-| Max lead messages per conversation | 40                                |
-| Max AI turns per lead per day      | 30                                |
-| Public chat rate limit             | 10 messages / minute / IP         |
-| Max tool rounds per turn           | 3                                 |
-| Organisation daily token ceiling   | Set by env; AI stops when reached |
-| Model ids                          | Env only (`LLM_MODEL_*`)          |
+| Setting                            | Default                                       |
+| ---------------------------------- | --------------------------------------------- |
+| Max characters per lead message    | 2,000                                         |
+| Max lead messages per conversation | 40                                            |
+| Max AI turns per lead per day      | 30                                            |
+| Public chat rate limit             | 10 messages / minute / IP                     |
+| Max tool rounds per turn           | 3                                             |
+| Organisation daily token ceiling   | Set by env; AI stops when reached             |
+| Model ids                          | Env (`LLM_MODEL_*`), default Claude Haiku 4.5 |
+| Organisation monthly cost ceiling  | `AI_MONTHLY_BUDGET_USD` (default 15)          |
 
 Costs come from a per-model price table in config; unknown models record cost as `null`, never 0.
 
@@ -303,3 +304,11 @@ Deviations from the plan above:
     with the AI off; the run reason is `escalation_topic:<code>` and the flag reason is
     `sensitive_topic` or `human_requested` (no new enum values). The first reply must say it is
     an AI (`rule:ai_disclosure_missing`). The approval steps are in `docs/prompt-approval.md`.
+13. **Founder answers** (2026-10-07, questions 6, 7, 9, 16 and the budget): both model slots default
+    to Claude Haiku 4.5 (budget 50 CAD/month for hosting and AI); a monthly cost ceiling
+    (`AI_MONTHLY_BUDGET_USD`, gate `org_monthly_budget`) joins the daily token ceiling, output caps
+    drop to 1,000/500 tokens and dated model ids are priced by alias. The prompt asks for location
+    and consultation availability when unknown and never says a prospect qualifies; no qualification
+    field is added for availability (the team reads it in the transcript). The consultation
+    schedule lives in `config/consultations.ts` for Phase 6; nothing is booked. Hand-overs are
+    recorded and flagged only (no email).

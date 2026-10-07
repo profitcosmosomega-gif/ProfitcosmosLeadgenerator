@@ -543,6 +543,12 @@ describe('turn gates (no model call)', () => {
     expect(result).toMatchObject({ turns: [{ reasons: ['copy_not_approved'] }] });
   });
 
+  it('organization monthly cost budget', async () => {
+    const { result, rows } = await gated(async () => {}, { monthlyBudgetMicroUsd: 0 });
+    expect(result).toMatchObject({ turns: [{ reasons: ['org_monthly_budget'] }] });
+    expect(rows.escalations).toMatchObject([{ reason: 'limit_reached' }]);
+  });
+
   it('organization daily token budget', async () => {
     const { result, rows } = await gated(async () => {}, { dailyTokenLimit: 0 });
     expect(result).toMatchObject({ turns: [{ reasons: ['org_daily_budget'] }] });
