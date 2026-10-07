@@ -2,7 +2,9 @@
 
 > Status: **IMPLEMENTED on the draft PR** (Issue #4), plan approved by the owner for
 > implementation. **Production prompt approval is not granted**: both prompts stay
-> `status: draft` and the AI answers no one until they are approved (§13). Differences between
+> `status: draft` and the AI answers no one until they are approved (§13,
+> [prompt-approval.md](prompt-approval.md)). Founder answers to questions 1, 2, 13 and 14
+> (2026-10-07) are incorporated in the 1.1.0 drafts. Differences between
 > this plan and the code are listed in §15.
 
 ## 1. Goal
@@ -294,3 +296,10 @@ Deviations from the plan above:
     by hand before asking for prompt approval.
 11. **Chat page** shows the "team will follow up" notice whenever the assistant is not available
     (AI off, prompts not approved, paused or flagged).
+12. **Founder answers** (2026-10-07, questions 1, 2, 13, 14): prompts move to 1.1.0 drafts (1.0.0
+    retired); chat copy 0.2.0 is bilingual and still unapproved, and the pipeline refuses to run
+    while it is unapproved (`copy_not_approved`). Always-escalate topics are detected in code
+    (EN/FR, `config/guardrails/rules.ts`) and flag the conversation before any model call, even
+    with the AI off; the run reason is `escalation_topic:<code>` and the flag reason is
+    `sensitive_topic` or `human_requested` (no new enum values). The first reply must say it is
+    an AI (`rule:ai_disclosure_missing`). The approval steps are in `docs/prompt-approval.md`.

@@ -3,6 +3,8 @@ import {
   checkLeak,
   checkOutputRules,
   classifyDraft,
+  checkFirstReplyDisclosure,
+  detectEscalationTopic,
   detectInjection,
   detectUnderage,
   PROMPT_CANARY,
@@ -148,5 +150,53 @@ describe('classifier', () => {
     }
     const failing = new ScriptedLlmProvider({ extraction: [new Error('down')] });
     expect((await classifyDraft(failing, prompt, input)).failures).toEqual(['classifier:error']);
+  });
+});
+
+describe('always-escalate topics', () => {
+  it.each([
+    ['Can I get my money back?', 'refund_cancellation'],
+    ['Je veux annuler mon inscription', 'refund_cancellation'],
+    ['Do you offer financing?', 'payment'],
+    ['Avez-vous un code promo?', 'payment'],
+    ['I have a dispute with my credit card company about you', 'payment'],
+    ['Je veux déposer une plainte', 'complaint_dispute'],
+    ['Is your academy regulated by the AMF?', 'legal_tax'],
+    ['Est-ce que je dois payer des impôts?', 'payment'],
+    ['What should I invest in right now?', 'personal_advice'],
+    ['Devrais-je vendre mes actions?', 'personal_advice'],
+    ['Supprimez toutes mes données svp, je veux supprimer mes données', 'privacy'],
+    ['Mon compte a été piraté', 'security'],
+    ['I want to speak with someone from your team', 'human_request'],
+  ])('flags %s', (text, code) => {
+    expect(detectEscalationTopic(text)?.code).toBe(code);
+  });
+
+  it.each([
+    'I struggle to deal with losses and discipline',
+    "I'm a beginner interested in forex and crypto",
+    'I want to start within 30 days',
+    "Je veux apprendre l'analyse technique",
+    'Mentorship sounds interesting',
+    'I did a free online course last year',
+    'My goal is to understand risk management',
+  ])('does not flag a normal qualification answer: %s', (text) => {
+    expect(detectEscalationTopic(text)).toBeNull();
+  });
+});
+
+describe('first-reply disclosure', () => {
+  it('accepts English and French AI disclosures', () => {
+    expect(checkFirstReplyDisclosure("Hi, I'm the ProfitCosmos Omega AI Assistant.")).toEqual([]);
+    expect(checkFirstReplyDisclosure('Bonjour, je suis un assistant IA.')).toEqual([]);
+    expect(checkFirstReplyDisclosure('Je suis une intelligence artificielle.')).toEqual([]);
+  });
+  it('rejects a first reply that does not say it is an AI', () => {
+    expect(checkFirstReplyDisclosure('Hello! How can I help?')).toEqual([
+      'rule:ai_disclosure_missing',
+    ]);
+    expect(checkFirstReplyDisclosure('I said it again and again')).toEqual([
+      'rule:ai_disclosure_missing',
+    ]);
   });
 });

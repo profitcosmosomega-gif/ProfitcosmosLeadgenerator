@@ -266,6 +266,22 @@ export async function hasUnhandledMessages(
   return Boolean(row);
 }
 
+/** True once the assistant has sent any message in the conversation (AI reply or fallback). */
+export async function hasSentAiMessage(db: DbExecutor, conversationId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.conversationId, conversationId),
+        eq(messages.author, 'ai'),
+        eq(messages.status, 'sent'),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
 export async function hasOpenEscalation(db: DbExecutor, conversationId: string): Promise<boolean> {
   const [row] = await db
     .select({ id: conversationEscalations.id })

@@ -122,6 +122,100 @@ export const injectionRule: GuardrailRule = {
   ],
 };
 
+/**
+ * Always-escalate topics (founder answer to business question 14). A lead message matching one of
+ * these flags the conversation for the team and pauses the AI before any model call, so the AI
+ * never tries to resolve them. The prompt asks the model to hand over too; this is the backstop.
+ * Leans broad: a false positive only hands a conversation to a person.
+ */
+export interface EscalationTopicRule extends GuardrailRule {
+  reason: 'human_requested' | 'sensitive_topic';
+}
+
+export const ESCALATION_TOPICS_VERSION = '1.0.0';
+
+export const escalationTopicRules: readonly EscalationTopicRule[] = [
+  {
+    code: 'human_request',
+    reason: 'human_requested',
+    description: 'Asks to talk to a person',
+    patterns: [
+      /\b(?:talk|speak|chat)\s+(?:to|with)\s+(?:a\s+|an\s+|someone|somebody|a\s+real|your)?\s*(?:real\s+)?(?:human|person|agent|advisor|adviser|representative|someone|somebody|team|staff|people)\b/i,
+      /\b(?:real|actual)\s+(?:human|person)\b/i,
+      /\bparler\s+(?:à|a|avec)\s+(?:un\s+|une\s+|votre\s+|l(?:'|’))?(?:vrai(?:e)?\s+)?(?:humain|personne|conseill(?:er|ère)|agent|équipe|représentant(?:e)?|quelqu(?:'|’)un)\b/i,
+      /\b(?:vrai(?:e)?\s+)(?:humain|personne)\b/i,
+    ],
+  },
+  {
+    code: 'refund_cancellation',
+    reason: 'sensitive_topic',
+    description: 'Refunds or cancellations',
+    patterns: [
+      /\brefund(?:s|ed|ing)?\b|\bmoney\s+back\b|\bcancel(?:l?ation|l?ed|l?ing|s)?\b|\bunsubscribe\b/i,
+      /\brembours\w*|\bannul(?:er|ation|ée|é)|\brésili\w*|\bdésabonn\w*/i,
+    ],
+  },
+  {
+    code: 'payment',
+    reason: 'sensitive_topic',
+    description: 'Payments, financing, discounts or promotions',
+    patterns: [
+      /\bpayments?\b|\bpay(?:ing)?\s+(?:for|in|by|with|monthly)\b|\bhow\s+(?:do|can)\s+i\s+pay\b|\bfinanc(?:ing|e\s+plan)\b|\binstall?ments?\b|\bcredit\s+card\b|\binvoice\b|\bcharged\b/i,
+      /\bdiscounts?\b|\bpromo(?:tions?|\s+codes?)?\b|\bcoupons?\b/i,
+      /\bpaiements?\b|\bpayer\b|\bfinancement\b|\bversements?\b|\bcarte\s+de\s+crédit\b|\bfacture\b/i,
+      /\brabais\b|\bréductions?\b|\bcode\s+promo\b|\bpromotions?\b|\bcoupons?\b/i,
+    ],
+  },
+  {
+    code: 'complaint_dispute',
+    reason: 'sensitive_topic',
+    description: 'Complaints or disputes',
+    patterns: [
+      /\bcomplain(?:t|ts|ing|ed)?\b|\bdisputes?\b|\bchargebacks?\b/i,
+      /\bplaintes?\b|\bme\s+plaindre\b|\blitiges?\b|\bcontest(?:er|ation)\b/i,
+    ],
+  },
+  {
+    code: 'legal_tax',
+    reason: 'sensitive_topic',
+    description: 'Legal, regulatory or tax questions',
+    patterns: [
+      /\blegal(?:ly)?\b|\blawyers?\b|\blaw\s*suits?\b|\bsue\b|\bregulat\w*|\blicen[cs]ed\b|\btax(?:es|ed)?\b|\bIIROC\b|\bCIRO\b|\bAMF\b|\bCRA\b/i,
+      /\blégal(?:e|ement)?\b|\bjuridique\b|\bavocat(?:e)?\b|\bpoursuit\w*|\brèglement\w*|\bréglementa\w*|\bimpôts?\b|\bfiscal\w*|\btaxes?\b/i,
+    ],
+  },
+  {
+    code: 'personal_advice',
+    reason: 'sensitive_topic',
+    description: 'Personalized trading or investment advice, or their own financial situation',
+    patterns: [
+      /\bshould\s+i\s+(?:\w+\s+){0,2}(?:buy|sell|short|invest|trade|go\s+long|go\s+short|hold|withdraw)\b/i,
+      /\bwhat\s+(?:should|would)\s+(?:i|you)\s+(?:buy|sell|invest\s+in|trade)\b|\bwhich\s+\w+\s+should\s+i\s+(?:buy|sell|trade|invest)\b/i,
+      /\bmy\s+(?:portfolio|brokerage|trading\s+account|savings|debts?|loans?|mortgage|rrsp|tfsa|retirement\s+(?:fund|savings))\b/i,
+      /\b(?:dois|devrais)[-\s]je\s+(?:\w+\s+){0,2}(?:acheter|vendre|investir|trader|shorter|garder)\b/i,
+      /\bmon\s+(?:portefeuille|compte\s+de\s+courtage|épargne|reer|celi|prêt|hypothèque)\b|\bmes\s+(?:dettes|placements|économies)\b/i,
+    ],
+  },
+  {
+    code: 'privacy',
+    reason: 'sensitive_topic',
+    description: 'Privacy or data-deletion requests',
+    patterns: [
+      /\bprivacy\b|\bpersonal\s+(?:data|information)\b|\b(?:delete|erase|remove)\s+(?:my|all\s+my)\s+(?:data|information|details|account)\b/i,
+      /\bconfidentialité\b|\bvie\s+privée\b|\bdonnées\s+personnelles\b|\b(?:supprimer|effacer)\s+(?:mes|toutes\s+mes)\s+(?:données|informations|renseignements)\b|\bloi\s+25\b/i,
+    ],
+  },
+  {
+    code: 'security',
+    reason: 'sensitive_topic',
+    description: 'Security concerns',
+    patterns: [
+      /\bhack(?:ed|er|ing)?\b|\bscam(?:med|mer)?\b|\bfraud\w*|\bphishing\b|\bsuspicious\b|\bstolen\b|\bidentity\s+theft\b/i,
+      /\bpirat(?:ée|é|age)|\barnaque\w*|\bfraude\w*|\bhameçonnage\b|\bsuspect\w*|\bvol(?:ée|é)(?![a-z])/i,
+    ],
+  },
+];
+
 const NEGATION =
   /\b(?:not|never|no(?!\s*[,.!])|cannot|can(?:'|’)t|won(?:'|’)t|don(?:'|’)t|doesn(?:'|’)t|isn(?:'|’)t|aren(?:'|’)t|nobody|no\s+one|nothing|ne|n(?:'|’)|pas|jamais|aucun|aucune|personne\s+ne)\b/i;
 

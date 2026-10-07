@@ -8,7 +8,7 @@ import { setConversationAiPaused } from '@/modules/conversations/service';
 import { updateLead } from '@/modules/leads/service';
 import { callTool, say, ScriptedLlmProvider } from '@/providers/llm/scripted';
 import { createOrg, resetDb } from '../helpers/db';
-import { conversationRows, leadSays, startChat, testDeps, verdict } from '../helpers/agent';
+import { conversationRows, intro, leadSays, startChat, testDeps, verdict } from '../helpers/agent';
 
 let orgId: string;
 
@@ -47,7 +47,7 @@ describe('agent turn pipeline', () => {
           fields: { experienceLevel: 'beginner', marketsOfInterest: ['forex'] },
           quote: "I'm a complete beginner and I'm curious about forex",
         }),
-        say('Welcome! What would you most like to get out of learning to trade?'),
+        say(intro('Welcome! What would you most like to get out of learning to trade?')),
       ],
       extraction: [verdict()],
     });
@@ -65,7 +65,7 @@ describe('agent turn pipeline', () => {
     expect(rows.messages[0]!.handledAt).not.toBeNull();
     expect(rows.messages[1]).toMatchObject({
       promptId: 'qualification-agent',
-      promptVersion: '1.0.0',
+      promptVersion: '1.1.0',
       guardrail: { passed: true, failures: [], attempt: 1 },
     });
 
@@ -78,7 +78,7 @@ describe('agent turn pipeline', () => {
     for (const run of rows.runs) {
       expect(run).toMatchObject({ provider: 'scripted', inputTokens: 100, outputTokens: 20 });
       expect(run.promptId).toBeTruthy();
-      expect(run.promptVersion).toBe('1.0.0');
+      expect(run.promptVersion).toBe('1.1.0');
     }
     expect(rows.runs[2]!.parentRunId).toBe(rows.runs[1]!.id);
     expect(rows.runs[0]!.toolCalls).toEqual([
@@ -101,7 +101,7 @@ describe('agent turn pipeline', () => {
   it('sends the history, state and tools to the model, never other leads data', async () => {
     await leadSays(chat.conversation, 'Hello there');
     const llm = new ScriptedLlmProvider({
-      conversation: [say('Hi! How much trading experience do you have?')],
+      conversation: [say(intro('How much trading experience do you have?'))],
       extraction: [verdict()],
     });
     await runAgentTurns(getDb(), testDeps(llm), {
@@ -142,7 +142,7 @@ describe('agent turn pipeline', () => {
           fields: { goals: ['retire early'] },
           quote: 'I want to retire early',
         }),
-        say('Thanks for sharing. What markets interest you?'),
+        say(intro('Thanks for sharing. What markets interest you?')),
       ],
       extraction: [verdict()],
     });
@@ -180,7 +180,7 @@ describe('agent turn pipeline', () => {
           quote: 'started trading crypto last year',
           extra: 'not allowed',
         }),
-        say('Thanks! What would you like to improve?'),
+        say(intro('Thanks! What would you like to improve?')),
       ],
       extraction: [verdict()],
     });
@@ -205,9 +205,7 @@ describe('agent turn pipeline', () => {
         (request) => {
           expect(request.tools!.map((t) => t.name)).toEqual(['request_human']);
           expect(request.systemContext).toContain('rule:guarantee');
-          return say(
-            'Trading involves risk and nobody can promise results. Our courses focus on education. What made you interested?',
-          ) as never;
+          return say(intro('Our courses focus on education. What made you interested?')) as never;
         },
       ],
       extraction: [verdict()],
@@ -225,13 +223,13 @@ describe('agent turn pipeline', () => {
     ]);
     expect(rows.messages[1]!.guardrail).toMatchObject({
       passed: false,
-      failures: ['rule:guarantee'],
+      failures: expect.arrayContaining(['rule:guarantee']),
     });
     expect(rows.messages[2]!.guardrail).toMatchObject({ passed: true, attempt: 2 });
   });
 
   it('sends the fixed fallback and flags a human when both drafts fail', async () => {
-    await leadSays(chat.conversation, 'Should I buy bitcoin now?');
+    await leadSays(chat.conversation, 'What do you think about bitcoin?');
     const llm = new ScriptedLlmProvider({
       conversation: [say('Sure, buy now before it goes up.'), say('You should buy some today.')],
     });
@@ -258,7 +256,7 @@ describe('agent turn pipeline', () => {
   it('fails closed when the classifier errors or answers badly', async () => {
     await leadSays(chat.conversation, 'Tell me about your programs');
     const llm = new ScriptedLlmProvider({
-      conversation: [say('We offer courses.'), say('We offer several courses.')],
+      conversation: [say(intro('We offer courses.')), say(intro('We offer several courses.'))],
       extraction: [new Error('boom'), say('looks fine to me')],
     });
     const result = await runAgentTurns(getDb(), testDeps(llm), {
@@ -339,11 +337,11 @@ describe('agent turn pipeline', () => {
   });
 
   it('flags a human without words when the model only hands over', async () => {
-    await leadSays(chat.conversation, 'Can I speak to a real person please?');
+    await leadSays(chat.conversation, "I'd rather sort this out with your team directly.");
     const llm = new ScriptedLlmProvider({
       conversation: [
         callTool('request_human', { reason: 'human_requested' }),
-        say('Of course, a member of our team will get back to you.'),
+        say(intro('A member of our team will get back to you.')),
       ],
       extraction: [verdict()],
     });
@@ -370,7 +368,7 @@ describe('agent turn pipeline', () => {
             { role: 'user', content: 'Hi' },
             { role: 'user', content: 'Are you there?' },
           ]);
-          return say('Yes, I am here. How can I help?') as never;
+          return say(intro('Yes, I am here. How can I help?')) as never;
         },
       ],
       extraction: [verdict()],
@@ -381,6 +379,41 @@ describe('agent turn pipeline', () => {
     });
     expect(result).toMatchObject({ turns: [{ outcome: 'replied' }] });
     expect(llm.remaining('conversation')).toBe(0);
+  });
+
+  it('requires the first reply to say it is an AI, but not later replies', async () => {
+    await leadSays(chat.conversation, 'Hello');
+    const llm = new ScriptedLlmProvider({
+      conversation: [
+        say('Hello! How much trading experience do you have?'),
+        (request) => {
+          expect(request.systemContext).toContain('rule:ai_disclosure_missing');
+          return say(intro('How much trading experience do you have?')) as never;
+        },
+        say('Great, and which markets interest you?'),
+      ],
+      extraction: [verdict(), verdict()],
+    });
+    const deps = testDeps(llm);
+    await runAgentTurns(getDb(), deps, {
+      organizationId: orgId,
+      conversationId: chat.conversation.id,
+    });
+    await leadSays(chat.conversation, 'A bit, mostly stocks');
+    const second = await runAgentTurns(getDb(), deps, {
+      organizationId: orgId,
+      conversationId: chat.conversation.id,
+    });
+    expect(second).toMatchObject({ turns: [{ outcome: 'replied' }] });
+    const rows = await conversationRows(chat.conversation.id);
+    expect(rows.messages.filter((m) => m.author === 'ai').map((m) => m.status)).toEqual([
+      'blocked',
+      'sent',
+      'sent',
+    ]);
+    expect(rows.messages.find((m) => m.status === 'blocked')!.guardrail!.failures).toEqual([
+      'rule:ai_disclosure_missing',
+    ]);
   });
 
   it('a second worker gets busy while the conversation is claimed', async () => {
@@ -477,6 +510,37 @@ describe('turn gates (no model call)', () => {
       conversationId: chat.conversation.id,
     });
     expect(result).toMatchObject({ turns: [{ reasons: ['age_not_confirmed'] }] });
+  });
+
+  it.each([
+    ['I want a refund for the course', 'refund_cancellation', 'sensitive_topic'],
+    ['Est-ce que je peux payer en plusieurs versements?', 'payment', 'sensitive_topic'],
+    ['Do you have a discount code?', 'payment', 'sensitive_topic'],
+    ['I want to file a complaint', 'complaint_dispute', 'sensitive_topic'],
+    ['Do I have to pay taxes on trading gains?', 'legal_tax', 'sensitive_topic'],
+    ['Should I sell my Tesla shares?', 'personal_advice', 'sensitive_topic'],
+    ["J'ai 20 000 $ dans mon CELI, je fais quoi?", 'personal_advice', 'sensitive_topic'],
+    ['Please delete my data', 'privacy', 'sensitive_topic'],
+    ['I think my account was hacked', 'security', 'sensitive_topic'],
+    ['Can I talk to a real person?', 'human_request', 'human_requested'],
+    ['Je veux parler à un conseiller', 'human_request', 'human_requested'],
+  ])('always-escalate topic before any model call: %s', async (text, code, reason) => {
+    const { result, rows } = await gated(async () => {}, {}, text);
+    expect(result).toMatchObject({
+      turns: [{ reasons: [`escalation_topic:${code}`], escalations: [reason] }],
+    });
+    expect(rows.runs).toMatchObject([{ status: 'skipped', reason: `escalation_topic:${code}` }]);
+    expect(rows.escalations).toMatchObject([{ reason, status: 'open' }]);
+  });
+
+  it('flags always-escalate topics even when the AI is off', async () => {
+    const { rows } = await gated(async () => {}, { aiEnabled: false }, 'I need a refund');
+    expect(rows.escalations).toMatchObject([{ reason: 'sensitive_topic' }]);
+  });
+
+  it('unapproved chat copy', async () => {
+    const { result } = await gated(async () => {}, { copyApproved: false });
+    expect(result).toMatchObject({ turns: [{ reasons: ['copy_not_approved'] }] });
   });
 
   it('organization daily token budget', async () => {

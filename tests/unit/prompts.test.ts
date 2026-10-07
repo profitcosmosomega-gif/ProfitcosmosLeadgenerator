@@ -40,7 +40,8 @@ describe('prompt registry', () => {
             .filter((line) => line.trim() && !line.startsWith('## '));
           expect(content.every((line) => line.startsWith('TODO'))).toBe(true);
         } else {
-          expect(meta.status).toBe('draft');
+          // Superseded drafts are retired; the active Phase 3 versions are drafts.
+          expect(['draft', 'retired']).toContain(meta.status);
         }
       }
     }

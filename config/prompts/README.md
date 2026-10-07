@@ -1,6 +1,6 @@
 # Prompts
 
-Versioned prompt files for the AI features. **Phase 1 contains stubs only — no production prompt text.**
+Versioned prompt files for the AI features. Phase 3 drafts are not approved; see `docs/prompt-approval.md`.
 
 ```
 config/prompts/<prompt-id>/v<semver>.md

@@ -99,3 +99,14 @@ prompt loader that refuses any prompt not marked `approved` (all prompts are stu
 - Erasure removes message text and closes the lead's conversations; export includes them.
 - The model receives the transcript, the names (not values) of details known from other sources
   and what was collected in this chat; never other leads' data, emails or phone numbers.
+- Founder answers (2026-10-07) built into the 1.1.0 draft prompts and chat copy: Canada first
+  (Quebec priority) with no legal, tax, investment or regulatory claims and no assumed
+  availability outside Canada; the assistant names itself "ProfitCosmos Omega AI Assistant",
+  says it is an AI in its first reply (checked in code), that it shares education and not
+  personalized advice, and that trading involves risk with no guaranteed results.
+- Always-escalate topics (refunds, cancellations, payments/financing, discounts, complaints,
+  disputes, legal/regulatory/tax, personalized advice or account-specific situations, privacy and
+  data deletion, security, human requests, under-18) flag the conversation and pause the AI; a
+  deterministic EN/FR rule catches them before any model call, so they are never resolved by the
+  AI. Approval of prompts and copy is a separate, explicit gate (`docs/prompt-approval.md`) and
+  does not replace legal review.

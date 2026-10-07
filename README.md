@@ -31,10 +31,9 @@ and seed, provider interfaces, **the lead database and CRM** (see
 [AI qualification agent](#ai-qualification-agent-phase-3)), tests, evaluations, CI and Docker
 images.
 
-> **The AI does not answer anyone yet.** Its prompts are drafts (`status: draft`) waiting for owner
-> approval, which depends on open business questions (countries, legal wording, assistant persona,
-> always-escalate topics). The prompt loader refuses drafts outside the test suite, so until
-> approval every chat message is stored and flagged for the team, and nothing is generated.
+> **The AI does not answer anyone yet.** Its prompts are drafts (`status: draft`) and the chat copy
+> is unapproved, waiting for the owner's explicit approval ([docs/prompt-approval.md](docs/prompt-approval.md)). The prompt loader refuses drafts outside the test suite, so until
+> approval chat messages are stored for the team and nothing is generated.
 
 The following are **intentionally not implemented yet**:
 
@@ -301,10 +300,16 @@ calls. Details: [docs/phase-3-plan.md](docs/phase-3-plan.md).
 - **AI runs**: every model call (reply and classifier) is an append-only `ai_runs` row with
   provider, model, prompt id and version, status, tokens, cost and tool outcomes, never text.
 
-**Go-live checklist**: answer business questions 1, 2, 13 and 14; review and approve the prompts
-in `config/prompts/qualification-agent` and `config/prompts/output-guardrail` (set `status:
-approved`, `approved_by`, `approved_at`) and the chat copy; run `EVAL_LIVE=1 pnpm eval`; set
-`ANTHROPIC_API_KEY` and `AI_ENABLED=true`.
+**Founder answers** (2026-10-07, business questions 1, 2, 13, 14) are in the 1.1.0 draft prompts
+and the chat copy: Canada first with no jurisdiction-specific claims, the "ProfitCosmos Omega AI
+Assistant" name and voice, AI disclosure in the first reply (checked in code), education-not-advice
+and risk statements, English/French mirroring, and the always-escalate topics. Those topics
+(refunds, cancellations, payments, discounts, complaints, disputes, legal/tax, personal advice or
+account situations, privacy, security, human requests) are also detected in code and flag the
+conversation before any model call.
+
+**Go-live**: follow [docs/prompt-approval.md](docs/prompt-approval.md). Prompts and chat copy
+stay unapproved until the owner signs off there; approval does not replace legal review.
 
 **Out of scope** (later phases): knowledge base, scoring, booking, handoff workflow and
 notifications, follow-ups, analytics, other channels, multi-tenant.

@@ -1,6 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
-import { injectionRule, matchRule, outputRules, underageRule } from '@config/guardrails/rules';
+import {
+  escalationTopicRules,
+  injectionRule,
+  matchRule,
+  outputRules,
+  underageRule,
+  type EscalationTopicRule,
+} from '@config/guardrails/rules';
 import { aiConfig } from '@config/ai';
 import type { PromptFile } from '@/lib/prompts';
 import type { LlmProvider, LlmResponse, LlmToolDefinition } from '@/providers/llm/types';
@@ -46,6 +53,22 @@ export function detectUnderage(text: string): boolean {
 
 export function detectInjection(text: string): boolean {
   return matchRule(injectionRule, text);
+}
+
+/** First always-escalate topic (business question 14) the message raises, if any. */
+export function detectEscalationTopic(text: string): EscalationTopicRule | null {
+  return escalationTopicRules.find((rule) => matchRule(rule, text)) ?? null;
+}
+
+const AI_DISCLOSURE =
+  /\b(?:AI|A\.I\.|IA|I\.A\.)(?![a-z])|artificial intelligence|intelligence artificielle/i;
+
+/**
+ * The first reply of a conversation must say it comes from an AI (business question 13). The
+ * chat page also shows the full disclosure; this makes sure the assistant says it itself.
+ */
+export function checkFirstReplyDisclosure(text: string): string[] {
+  return AI_DISCLOSURE.test(text) ? [] : ['rule:ai_disclosure_missing'];
 }
 
 // ---------------------------------------------------------------------------------------------

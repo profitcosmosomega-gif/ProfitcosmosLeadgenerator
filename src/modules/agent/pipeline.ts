@@ -12,6 +12,7 @@ import {
   createEscalation,
   findConversation,
   hasOpenEscalation,
+  hasSentAiMessage,
   hasUnhandledMessages,
   insertAiMessage,
   leadMessagesOf,
@@ -35,6 +36,8 @@ import {
   checkLeak,
   checkOutputRules,
   classifyDraft,
+  checkFirstReplyDisclosure,
+  detectEscalationTopic,
   detectInjection,
   detectUnderage,
   PROMPT_CANARY,
@@ -71,6 +74,8 @@ export interface AgentDeps {
   llm: LlmProvider | null;
   loadPrompt: (id: string) => Promise<PromptFile>;
   aiEnabled: boolean;
+  /** The fixed chat texts are approved (`config/chat-copy.ts`); the AI does not run otherwise. */
+  copyApproved: boolean;
   dailyTokenLimit: number;
   now?: () => Date;
 }
@@ -81,6 +86,7 @@ export function defaultAgentDeps(): AgentDeps {
     llm: getLlmProvider(),
     loadPrompt: (id) => loadActivePrompt(id),
     aiEnabled: env.AI_ENABLED,
+    copyApproved: chatCopy.approved,
     dailyTokenLimit: env.AI_DAILY_TOKEN_LIMIT,
   };
 }
@@ -95,7 +101,12 @@ export async function assistantAvailable(
   conversation: Conversation,
 ): Promise<boolean> {
   if (conversation.status !== 'active' || conversation.aiPaused) return false;
-  if (!deps.aiEnabled || !deps.llm?.modelFor('conversation') || !deps.llm.modelFor('extraction')) {
+  if (
+    !deps.aiEnabled ||
+    !deps.copyApproved ||
+    !deps.llm?.modelFor('conversation') ||
+    !deps.llm.modelFor('extraction')
+  ) {
     return false;
   }
   try {
@@ -186,10 +197,16 @@ async function evaluateGate(
   if (pending.some((m) => m.body && detectUnderage(m.body))) {
     return { gate: { code: 'possible_underage', escalate: 'possible_underage' } };
   }
+  // Always-escalate topics: the team handles them, the AI never tries (business question 14).
+  for (const message of pending) {
+    const topic = message.body ? detectEscalationTopic(message.body) : null;
+    if (topic) return { gate: { code: `escalation_topic:${topic.code}`, escalate: topic.reason } };
+  }
   if (!deps.aiEnabled) return { gate: { code: 'ai_disabled' } };
   if (!deps.llm || !deps.llm.modelFor('conversation') || !deps.llm.modelFor('extraction')) {
     return { gate: { code: 'ai_not_configured' } };
   }
+  if (!deps.copyApproved) return { gate: { code: 'copy_not_approved' } };
   let prompts: { agent: PromptFile; guardrail: PromptFile };
   try {
     prompts = {
@@ -269,10 +286,11 @@ async function processTurn(
   }
 
   const llm = deps.llm;
-  const [qualification, leadMessages, transcript] = await Promise.all([
+  const [qualification, leadMessages, transcript, alreadyReplied] = await Promise.all([
     getLeadQualification(db, organizationId, lead.id),
     leadMessagesOf(db, conversation.id),
     recentTranscript(db, conversation.id, aiConfig.historyMessages),
+    hasSentAiMessage(db, conversation.id),
   ]);
   const toolContext: ToolContext = {
     leadMessages,
@@ -332,7 +350,11 @@ async function processTurn(
       continue;
     }
 
-    let failures = [...checkOutputRules(text), ...checkLeak(text, systemPrompt)];
+    let failures = [
+      ...checkOutputRules(text),
+      ...checkLeak(text, systemPrompt),
+      ...(alreadyReplied ? [] : checkFirstReplyDisclosure(text)),
+    ];
     if (failures.length === 0) {
       failures = await runClassifier(db, llm, {
         base,

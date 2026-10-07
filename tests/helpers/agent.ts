@@ -15,6 +15,7 @@ export function testDeps(llm: LlmProvider | null, overrides: Partial<AgentDeps> 
     llm,
     loadPrompt: (id) => loadActivePrompt(id, { allowDraft: true }),
     aiEnabled: true,
+    copyApproved: true,
     dailyTokenLimit: 10_000_000,
     ...overrides,
   };
@@ -36,6 +37,12 @@ export function verdict(...flagged: (typeof VERDICT_KEYS)[number][]): ScriptedSt
     Object.fromEntries(VERDICT_KEYS.map((key) => [key, flagged.includes(key)])),
   );
 }
+
+/** First-reply disclosure the prompt asks for (business questions 2 and 13). */
+export const INTRO =
+  "Hi, I'm the ProfitCosmos Omega AI Assistant. I share educational information, not personalized financial advice, and trading involves risk: results are not guaranteed.";
+
+export const intro = (text: string) => `${INTRO} ${text}`;
 
 let counter = 0;
 
