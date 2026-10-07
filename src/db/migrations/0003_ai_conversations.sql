@@ -1,7 +1,7 @@
 CREATE TYPE "public"."ai_run_purpose" AS ENUM('turn', 'guardrail');--> statement-breakpoint
 CREATE TYPE "public"."ai_run_status" AS ENUM('succeeded', 'failed', 'blocked', 'skipped');--> statement-breakpoint
 CREATE TYPE "public"."conversation_status" AS ENUM('active', 'closed');--> statement-breakpoint
-CREATE TYPE "public"."escalation_reason" AS ENUM('human_requested', 'cannot_confirm', 'sensitive_topic', 'possible_underage', 'abusive', 'guardrail_failure', 'limit_reached');--> statement-breakpoint
+CREATE TYPE "public"."escalation_reason" AS ENUM('human_requested', 'cannot_confirm', 'sensitive_topic', 'possible_underage', 'abusive', 'guardrail_failure', 'ai_error', 'limit_reached');--> statement-breakpoint
 CREATE TYPE "public"."escalation_status" AS ENUM('open', 'resolved');--> statement-breakpoint
 CREATE TYPE "public"."message_author" AS ENUM('lead', 'ai', 'system');--> statement-breakpoint
 CREATE TYPE "public"."message_direction" AS ENUM('in', 'out');--> statement-breakpoint

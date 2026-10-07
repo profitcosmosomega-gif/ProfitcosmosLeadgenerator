@@ -517,6 +517,24 @@ export async function getLeadDetail(db: Database, organizationId: string, leadId
   };
 }
 
+/** The lead's qualification row (values and provenance), or null. */
+export async function getLeadQualification(
+  db: DbExecutor,
+  organizationId: string,
+  leadId: string,
+): Promise<LeadQualification | null> {
+  const [row] = await db
+    .select()
+    .from(leadQualification)
+    .where(
+      and(
+        eq(leadQualification.leadId, leadId),
+        eq(leadQualification.organizationId, organizationId),
+      ),
+    );
+  return row ?? null;
+}
+
 /** Timeline for a lead, including the history of any leads merged into it. Newest first. */
 export async function getTimeline(db: Database, organizationId: string, leadId: string) {
   const lead = await findLead(db, organizationId, leadId);

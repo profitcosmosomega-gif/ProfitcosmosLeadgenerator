@@ -38,6 +38,7 @@ export const escalationReason = pgEnum('escalation_reason', [
   'possible_underage',
   'abusive',
   'guardrail_failure',
+  'ai_error',
   'limit_reached',
 ]);
 export const escalationStatus = pgEnum('escalation_status', ['open', 'resolved']);

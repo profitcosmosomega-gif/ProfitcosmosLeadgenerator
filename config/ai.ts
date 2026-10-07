@@ -16,9 +16,9 @@ export const aiConfig = {
   maxToolRounds: 3,
   /** Messages of history sent to the model. */
   historyMessages: 20,
-  /** Output token cap for a conversation reply and for a guardrail verdict. */
-  maxReplyTokens: 2_000,
-  maxGuardrailTokens: 1_000,
+  /** Output token caps (reasoning counts towards them) for a reply and for a guardrail verdict. */
+  maxReplyTokens: 8_000,
+  maxGuardrailTokens: 4_000,
   /** Worker lease on a conversation while a turn runs. */
   turnLeaseSeconds: 120,
 } as const;

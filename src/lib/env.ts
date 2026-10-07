@@ -38,11 +38,13 @@ export const envSchema = z.object({
   SMTP_PASSWORD: z.string().optional(),
   SMTP_SECURE: booleanFromString.default(false),
 
-  // AI is not used in Phase 1. Kill-switch defaults to off.
+  // AI qualification agent (Phase 3). Kill-switch defaults to off: no model is ever called.
   AI_ENABLED: booleanFromString.default(false),
   ANTHROPIC_API_KEY: z.string().optional(),
   LLM_MODEL_CONVERSATION: z.string().optional(),
   LLM_MODEL_EXTRACTION: z.string().optional(),
+  // Tokens (input + output) the organisation may spend per UTC day; the AI stops when reached.
+  AI_DAILY_TOKEN_LIMIT: z.coerce.number().int().positive().default(500_000),
 });
 
 export type Env = z.infer<typeof envSchema>;

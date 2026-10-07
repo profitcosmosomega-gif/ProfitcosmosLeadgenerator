@@ -1,6 +1,6 @@
 {
-  "id": "60a341a4-bdee-4769-8311-539c89767e50",
-  "prevId": "fb2aa2e4-68a6-47f3-ac67-579887198531",
+  "id": "953150b6-90dd-4639-8b30-cf6886359b46",
+  "prevId": "dd9834f3-c72b-4bcd-b941-570abd5a1e64",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3118,6 +3118,7 @@
         "possible_underage",
         "abusive",
         "guardrail_failure",
+        "ai_error",
         "limit_reached"
       ]
     },

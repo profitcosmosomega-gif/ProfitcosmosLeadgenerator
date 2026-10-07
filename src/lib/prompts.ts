@@ -57,11 +57,24 @@ export async function readPromptFile(id: string, version: string): Promise<Promp
   return file;
 }
 
-/** Load the active version of a prompt. Throws unless the prompt is approved. */
-export async function loadActivePrompt(id: string): Promise<PromptFile> {
+/**
+ * Load the active version of a prompt. Throws unless the prompt is approved.
+ *
+ * `allowDraft` lets the automated tests and scripted evaluations exercise a `draft` prompt
+ * before the owner approves it. It only works when NODE_ENV is "test"; anywhere else it throws,
+ * so production code can never serve an unapproved prompt.
+ */
+export async function loadActivePrompt(
+  id: string,
+  options: { allowDraft?: boolean } = {},
+): Promise<PromptFile> {
+  if (options.allowDraft && process.env.NODE_ENV !== 'test') {
+    throw new Error('Draft prompts can only be loaded by the test suite');
+  }
   const entry = promptRegistry.find((p) => p.id === id);
   if (!entry) throw new Error(`Unknown prompt "${id}"`);
   const file = await readPromptFile(id, entry.activeVersion);
+  if (options.allowDraft && file.meta.status === 'draft') return file;
   if (file.meta.status !== 'approved' || !file.meta.approved_by || !file.meta.approved_at) {
     throw new PromptNotApprovedError(id, entry.activeVersion, file.meta.status);
   }
