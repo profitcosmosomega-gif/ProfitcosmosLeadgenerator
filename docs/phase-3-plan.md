@@ -316,3 +316,13 @@ Deviations from the plan above:
     `qualification-agent@1.1.0` draft ("Common objections": price, time, "does it work", free
     resources, past losses, needs to think, not ready). No figures, no promises; price objections
     hand over with `cannot_confirm`. Part of the same founder approval.
+15. **Founder answers with no Phase 3 change** (2026-10-07, consolidated on the PR): the Phase 2
+    consent wording stays as a placeholder pending legal review (question 2); lead sources are
+    Instagram/Facebook and direct outreach at low volume, and the Phase 2 touchpoints (free-text
+    source and UTM fields, click ids such as fbclid) already allow new channels (question 4); no
+    existing CRM, start fresh (question 10); no email domain yet (question 17); enrollments and
+    payments are entered by hand, no payment integration (question 18); no ad-cost tracking
+    (question 19); the MVP target is 10 or more qualified consultations booked per month after 60–90
+    days, with less manual follow-up (question 20, an input for later analytics phases). The
+    same-business-day response target for hand-overs (question 9) is a team target; Phase 3 only
+    records and flags.
