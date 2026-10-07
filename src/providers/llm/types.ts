@@ -1,6 +1,6 @@
 /*
- * LLM provider contract. Types only in Phase 1 — no implementation, no prompts.
- * The AI qualification agent (Phase 3) depends on this interface, never on a vendor SDK directly.
+ * LLM provider contract. The AI qualification agent depends on this interface, never on a vendor
+ * SDK directly. Implementations: `anthropic.ts` (production) and `scripted.ts` (tests and evals).
  */
 
 export type LlmRole = 'user' | 'assistant';
@@ -24,7 +24,16 @@ export interface LlmToolResultBlock {
   isError?: boolean;
 }
 
-export type LlmContentBlock = LlmTextBlock | LlmToolUseBlock | LlmToolResultBlock;
+/**
+ * Provider-specific block the caller must hand back unchanged on the next request of the same
+ * turn (e.g. model reasoning). Never shown, stored or logged.
+ */
+export interface LlmOpaqueBlock {
+  type: 'opaque';
+  raw: unknown;
+}
+
+export type LlmContentBlock = LlmTextBlock | LlmToolUseBlock | LlmToolResultBlock | LlmOpaqueBlock;
 
 export interface LlmMessage {
   role: LlmRole;
@@ -43,11 +52,12 @@ export interface LlmRequest {
   model: 'conversation' | 'extraction';
   /** Versioned prompt id from config/prompts (e.g. "qualification-agent@0.1.0"). */
   promptId: string;
+  /** Stable part of the system prompt (cacheable), then per-turn context. */
   system: string;
+  systemContext?: string;
   messages: LlmMessage[];
   tools?: LlmToolDefinition[];
   maxOutputTokens: number;
-  temperature?: number;
   /** Correlates the call with ai_runs / lead records for auditing. */
   metadata?: { leadId?: string; conversationId?: string; requestId?: string };
 }
@@ -70,5 +80,28 @@ export interface LlmResponse {
 
 export interface LlmProvider {
   readonly name: string;
+  /** Concrete model id configured for a slot, or null when not configured. */
+  modelFor(slot: LlmRequest['model']): string | null;
   generate(request: LlmRequest): Promise<LlmResponse>;
+}
+
+export type LlmErrorCode =
+  | 'not_configured'
+  | 'rate_limited'
+  | 'overloaded'
+  | 'timeout'
+  | 'connection'
+  | 'bad_request'
+  | 'auth'
+  | 'provider_error';
+
+/** Provider failure. Carries a code only: vendor messages may echo request content. */
+export class LlmProviderError extends Error {
+  constructor(
+    readonly code: LlmErrorCode,
+    readonly status?: number,
+  ) {
+    super(`LLM provider error: ${code}`);
+    this.name = 'LlmProviderError';
+  }
 }

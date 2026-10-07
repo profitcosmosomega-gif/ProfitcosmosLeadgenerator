@@ -79,3 +79,34 @@ prompt loader that refuses any prompt not marked `approved` (all prompts are stu
   strings; `lead_events` and `stage_transitions` are append-only at database level.
 - Nothing is sent to leads yet: consent is recorded, but no outbound messaging exists until
   Phase 8, where consent and suppression will be checked at send time.
+
+**Phase 3** (AI qualification agent):
+
+- The assistant says it is an AI (chat page disclosure; persona text pending business question 13)
+  and never claims to be a person (rule filter + classifier).
+- Every draft reply passes a rule filter (guarantees, risk-free, earnings claims, money figures,
+  trade instructions, human claims; English and French), a prompt-leak check and a model
+  classifier (personalised advice, guarantees, unsupported claims, internal disclosure). Failing
+  drafts are never sent; after one retry a fixed fallback is sent and the team is flagged.
+- Program, price and policy questions the assistant cannot confirm are flagged for the team
+  (`cannot_confirm`).
+- A message suggesting the person is under 18 stops the AI and flags the team before any model
+  call. The pre-chat form requires the 18+ confirmation.
+- Prompts are drafts until the owner approves them; the loader refuses drafts outside tests. ⚠️
+  The fixed chat texts (`config/chat-copy.ts`) are placeholders stored as `approved: false`.
+- No message text, prompt text or token is logged; AI runs and timeline events store ids, codes
+  and counts only. Drafts that may disclose internal instructions are not stored.
+- Erasure removes message text and closes the lead's conversations; export includes them.
+- The model receives the transcript, the names (not values) of details known from other sources
+  and what was collected in this chat; never other leads' data, emails or phone numbers.
+- Founder answers (2026-10-07) built into the 1.1.0 draft prompts and chat copy: Canada first
+  (Quebec priority) with no legal, tax, investment or regulatory claims and no assumed
+  availability outside Canada; the assistant names itself "ProfitCosmos Omega AI Assistant",
+  says it is an AI in its first reply (checked in code), that it shares education and not
+  personalized advice, and that trading involves risk with no guaranteed results.
+- Always-escalate topics (refunds, cancellations, payments/financing, discounts, complaints,
+  disputes, legal/regulatory/tax, personalized advice or account-specific situations, privacy and
+  data deletion, security, human requests, under-18) flag the conversation and pause the AI; a
+  deterministic EN/FR rule catches them before any model call, so they are never resolved by the
+  AI. Approval of prompts and copy is a separate, explicit gate (`docs/prompt-approval.md`) and
+  does not replace legal review.

@@ -38,11 +38,16 @@ export const envSchema = z.object({
   SMTP_PASSWORD: z.string().optional(),
   SMTP_SECURE: booleanFromString.default(false),
 
-  // AI is not used in Phase 1. Kill-switch defaults to off.
+  // AI qualification agent (Phase 3). Kill-switch defaults to off: no model is ever called.
   AI_ENABLED: booleanFromString.default(false),
   ANTHROPIC_API_KEY: z.string().optional(),
-  LLM_MODEL_CONVERSATION: z.string().optional(),
-  LLM_MODEL_EXTRACTION: z.string().optional(),
+  // Low-cost default for low-volume testing (founder budget: 50 CAD/month for hosting and AI).
+  LLM_MODEL_CONVERSATION: z.string().min(1).default('claude-haiku-4-5'),
+  LLM_MODEL_EXTRACTION: z.string().min(1).default('claude-haiku-4-5'),
+  // Tokens (input + output) the organisation may spend per UTC day; the AI stops when reached.
+  AI_DAILY_TOKEN_LIMIT: z.coerce.number().int().positive().default(200_000),
+  // Recorded AI cost (US dollars) the organisation may spend per UTC calendar month.
+  AI_MONTHLY_BUDGET_USD: z.coerce.number().positive().default(15),
 });
 
 export type Env = z.infer<typeof envSchema>;

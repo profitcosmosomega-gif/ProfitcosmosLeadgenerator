@@ -19,6 +19,10 @@ export const REDACT_PATHS = [
   'headers.authorization',
   '*.headers.cookie',
   '*.headers.authorization',
+  // Phase 3: message text, prompts and conversation tokens never reach the logs.
+  ...['body', 'text', 'quote', 'content', 'system', 'prompt', 'messages', 'fullName']
+    .concat(['accessToken', 'authorization', 'input'])
+    .flatMap((key) => [key, `*.${key}`]),
 ];
 
 function createLogger(): Logger {

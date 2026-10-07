@@ -18,7 +18,7 @@ describe('prompt registry', () => {
     }
   });
 
-  it('Phase 1 prompts are stubs with TODO placeholders only', async () => {
+  it('no prompt is approved; only Phase 3 drafts carry text, older versions stay stubs', async () => {
     const dirs = (await readdir(PROMPTS_DIR, { withFileTypes: true })).filter((d) =>
       d.isDirectory(),
     );
@@ -28,13 +28,21 @@ describe('prompt registry', () => {
         const { meta, body } = parsePromptFile(
           await readFile(path.join(PROMPTS_DIR, dir.name, name), 'utf8'),
         );
-        expect(meta.status).toBe('stub');
-        // Every section body is a single TODO placeholder line.
-        const content = body
-          .replace(/<!--[\s\S]*?-->/g, '')
-          .split('\n')
-          .filter((line) => line.trim() && !line.startsWith('## '));
-        expect(content.every((line) => line.startsWith('TODO'))).toBe(true);
+        // Production prompt approval has not been granted (owner gate).
+        expect(meta.status).not.toBe('approved');
+        expect(meta.approved_by).toBeNull();
+        if (meta.version.startsWith('0.')) {
+          expect(meta.status).toBe('stub');
+          // Every section body is a single TODO placeholder line.
+          const content = body
+            .replace(/<!--[\s\S]*?-->/g, '')
+            .split('\n')
+            .filter((line) => line.trim() && !line.startsWith('## '));
+          expect(content.every((line) => line.startsWith('TODO'))).toBe(true);
+        } else {
+          // Superseded drafts are retired; the active Phase 3 versions are drafts.
+          expect(['draft', 'retired']).toContain(meta.status);
+        }
       }
     }
   });
@@ -43,6 +51,30 @@ describe('prompt registry', () => {
     await expect(loadActivePrompt('qualification-agent')).rejects.toBeInstanceOf(
       PromptNotApprovedError,
     );
+  });
+
+  it('refuses drafts unless explicitly allowed in the test environment', async () => {
+    await expect(loadActivePrompt('output-guardrail')).rejects.toBeInstanceOf(
+      PromptNotApprovedError,
+    );
+    const draft = await loadActivePrompt('qualification-agent', { allowDraft: true });
+    expect(draft.meta.status).toBe('draft');
+    // Stubs are never served, even when drafts are allowed.
+    await expect(
+      loadActivePrompt('conversation-summary', { allowDraft: true }),
+    ).rejects.toBeInstanceOf(PromptNotApprovedError);
+  });
+
+  it('allowDraft throws outside the test environment', async () => {
+    const previous = process.env.NODE_ENV;
+    try {
+      Object.assign(process.env, { NODE_ENV: 'production' });
+      await expect(loadActivePrompt('qualification-agent', { allowDraft: true })).rejects.toThrow(
+        'test suite',
+      );
+    } finally {
+      Object.assign(process.env, { NODE_ENV: previous });
+    }
   });
 
   it('rejects unknown prompts', async () => {

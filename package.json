@@ -19,6 +19,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "eval": "vitest run tests/evals",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",
@@ -27,6 +28,7 @@
     "check": "pnpm lint && pnpm typecheck && pnpm format:check && pnpm test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "better-auth": "^1.7.7",
     "drizzle-orm": "^0.45.3",
     "next": "^16.3.8",

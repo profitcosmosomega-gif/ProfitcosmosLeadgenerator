@@ -14,7 +14,7 @@ booked consultations and, eventually, enrolled students while reducing manual wo
 | ----- | ----------------------------------------------------------- | ------- |
 | 1     | Architecture and repository foundation                      | ✅ Done |
 | 2     | Lead database and CRM                                       | ✅ Done |
-| 3     | AI qualification agent                                      | Planned |
+| 3     | AI qualification agent                                      | ✅ Done |
 | 4     | Knowledge base                                              | Planned |
 | 5     | Lead scoring                                                | Planned |
 | 6     | Calendar and appointment booking                            | Planned |
@@ -23,26 +23,31 @@ booked consultations and, eventually, enrolled students while reducing manual wo
 | 9     | Analytics dashboard                                         | Planned |
 | 10–12 | Additional channels, campaign automation, multi-tenant SaaS | Planned |
 
-### Current boundary (Phases 1–2 implemented)
+### Current boundary (Phases 1–3 implemented)
 
 **Implemented**: staff sign-in and roles, audit log, health check, background worker, migrations
 and seed, provider interfaces, **the lead database and CRM** (see
-[Lead database and CRM](#lead-database-and-crm-phase-2)), tests, CI and Docker images.
+[Lead database and CRM](#lead-database-and-crm-phase-2)), **the AI qualification agent** (see
+[AI qualification agent](#ai-qualification-agent-phase-3)), tests, evaluations, CI and Docker
+images.
+
+> **The AI does not answer anyone yet.** Its prompts are drafts (`status: draft`) and the chat copy
+> is unapproved, waiting for the owner's explicit approval ([docs/prompt-approval.md](docs/prompt-approval.md)). The prompt loader refuses drafts outside the test suite, so until
+> approval chat messages are stored for the team and nothing is generated.
 
 The following are **intentionally not implemented yet**:
 
-| Not implemented                                     | Planned phase | What exists today                                             |
-| --------------------------------------------------- | ------------- | ------------------------------------------------------------- |
-| AI conversations / qualification agent, chat widget | 3             | `LlmProvider` interface (types only); `AI_ENABLED=false`      |
-| Production prompt content                           | 3+            | Versioned stubs with TODO placeholders; loader refuses them   |
-| Knowledge base                                      | 4             | Nothing                                                       |
-| Lead scoring                                        | 5             | Ruleset types and band thresholds only; "qualified" is manual |
-| Calendar / appointment booking workflow             | 6             | `CalendarProvider` interface (types only)                     |
-| Human sales handoff                                 | 7             | Nothing                                                       |
-| Follow-up automation, outbound messaging            | 8             | `ChannelAdapter` interface; nothing is ever sent to leads     |
-| Analytics dashboard, ad-spend import                | 9             | Attribution data is captured; no reports                      |
-| Additional channels (WhatsApp, Instagram, …)        | 10            | `channel_identities` table and link/resolve service only      |
-| Multi-tenant behaviour (tenant UI, RLS)             | 12            | `organization_id` on every table; runs single-tenant          |
+| Not implemented                              | Planned phase  | What exists today                                             |
+| -------------------------------------------- | -------------- | ------------------------------------------------------------- |
+| Approved production prompts and chat copy    | before go-live | Phase 3 drafts and placeholder copy; loader refuses drafts    |
+| Knowledge base                               | 4              | Nothing                                                       |
+| Lead scoring                                 | 5              | Ruleset types and band thresholds only; "qualified" is manual |
+| Calendar / appointment booking workflow      | 6              | `CalendarProvider` interface (types only)                     |
+| Human sales handoff                          | 7              | Nothing                                                       |
+| Follow-up automation, outbound messaging     | 8              | `ChannelAdapter` interface; nothing is ever sent to leads     |
+| Analytics dashboard, ad-spend import         | 9              | Attribution data is captured; no reports                      |
+| Additional channels (WhatsApp, Instagram, …) | 10             | `channel_identities` table and link/resolve service only      |
+| Multi-tenant behaviour (tenant UI, RLS)      | 12             | `organization_id` on every table; runs single-tenant          |
 
 ## Architecture overview
 
@@ -102,21 +107,25 @@ only: secrets (`BETTER_AUTH_SECRET`, `SEED_OWNER_PASSWORD`, `SMTP_PASSWORD`, `AN
 are left empty, and the `postgres:postgres` database credentials match the local Docker Compose
 database only. In production, supply values through the host's secret manager.
 
-| Variable                            | Required | Default                     | Purpose                                 |
-| ----------------------------------- | -------- | --------------------------- | --------------------------------------- |
-| `DATABASE_URL`                      | yes      | —                           | Postgres connection string              |
-| `BETTER_AUTH_SECRET`                | yes      | —                           | Session signing secret (≥ 32 chars)     |
-| `APP_URL`                           | no       | `http://localhost:3000`     | Public base URL (auth, trusted origin)  |
-| `LOG_LEVEL`                         | no       | `info`                      | pino log level                          |
-| `DEFAULT_ORGANIZATION_SLUG`         | no       | `profitcosmos-omega`        | The single tenant                       |
-| `PUBLIC_FORM_ORIGINS`               | no       | — (only `APP_URL`)          | Extra origins allowed to post the form  |
-| `PUBLIC_FORM_RATE_LIMIT_PER_MINUTE` | no       | `10`                        | Public form submissions per IP / minute |
-| `EMAIL_PROVIDER`                    | no       | `console`                   | `console` (log only) or `smtp`          |
-| `EMAIL_FROM`, `SMTP_*`              | no       | Mailpit on `localhost:1025` | Outbound email                          |
-| `AI_ENABLED`                        | no       | `false`                     | AI kill-switch (unused in Phase 1)      |
-| `ANTHROPIC_API_KEY`, `LLM_MODEL_*`  | no       | —                           | Reserved for Phase 3                    |
-| `SEED_OWNER_EMAIL` / `_PASSWORD`    | seed     | —                           | Owner account created by `pnpm db:seed` |
-| `TEST_DATABASE_URL`                 | tests    | `…/profitcosmos_test`       | Database the test suite **resets**      |
+| Variable                            | Required | Default                     | Purpose                                          |
+| ----------------------------------- | -------- | --------------------------- | ------------------------------------------------ |
+| `DATABASE_URL`                      | yes      | —                           | Postgres connection string                       |
+| `BETTER_AUTH_SECRET`                | yes      | —                           | Session signing secret (≥ 32 chars)              |
+| `APP_URL`                           | no       | `http://localhost:3000`     | Public base URL (auth, trusted origin)           |
+| `LOG_LEVEL`                         | no       | `info`                      | pino log level                                   |
+| `DEFAULT_ORGANIZATION_SLUG`         | no       | `profitcosmos-omega`        | The single tenant                                |
+| `PUBLIC_FORM_ORIGINS`               | no       | — (only `APP_URL`)          | Extra origins allowed to post the form           |
+| `PUBLIC_FORM_RATE_LIMIT_PER_MINUTE` | no       | `10`                        | Public form submissions per IP / minute          |
+| `EMAIL_PROVIDER`                    | no       | `console`                   | `console` (log only) or `smtp`                   |
+| `EMAIL_FROM`, `SMTP_*`              | no       | Mailpit on `localhost:1025` | Outbound email                                   |
+| `AI_ENABLED`                        | no       | `false`                     | AI kill-switch: no model call when off           |
+| `ANTHROPIC_API_KEY`                 | no       | —                           | Claude API key (AI stays off without)            |
+| `LLM_MODEL_CONVERSATION`            | no       | `claude-haiku-4-5`          | Model for agent replies (low cost)               |
+| `LLM_MODEL_EXTRACTION`              | no       | `claude-haiku-4-5`          | Model for the output classifier                  |
+| `AI_DAILY_TOKEN_LIMIT`              | no       | `200000`                    | Organization-wide tokens per UTC day             |
+| `AI_MONTHLY_BUDGET_USD`             | no       | `15`                        | Organization-wide recorded AI cost per UTC month |
+| `SEED_OWNER_EMAIL` / `_PASSWORD`    | seed     | —                           | Owner account created by `pnpm db:seed`          |
+| `TEST_DATABASE_URL`                 | tests    | `…/profitcosmos_test`       | Database the test suite **resets**               |
 
 ## Project structure
 
@@ -127,21 +136,30 @@ src/
     (admin)/admin      protected admin: leads list, lead detail, CSV import
     api/auth/[...all]  Better Auth endpoints
     api/health         health check (database + queue)
+    (admin)/admin/conversations  conversation review (transcript, AI runs, flags)
+    chat               public chat page (pre-chat form + conversation)
     api/public/leads   public lead-capture endpoint for website forms
-    api/v1/            versioned staff REST API (me, leads, imports, admin/audit-log)
+    api/public/conversations  public chat API (start, send, poll)
+    api/v1/            versioned staff REST API (me, leads, imports, conversations,
+                       escalations, admin/audit-log)
   db/                  Drizzle client, schema, migrations, migrate + seed logic
   lib/                 env, logger, errors, api handler, auth, session, rbac, queue, prompts
   modules/             domain modules: leads, crm (stage transitions), consents, attribution,
-                       imports, channels (contract + identities), audit, organizations, staff, health
+                       imports, channels (contract + identities), audit, organizations, staff, health,
+                       conversations (messages, flags, tokens), agent (turn pipeline, tools,
+                       guardrails, AI runs, queue)
   providers/           external-service contracts and adapters (llm, calendar, email)
   worker/              pg-boss worker, job registry, jobs
 config/
   pipeline.ts          CRM stages and allowed transitions
   consent.ts           consent wording shown on forms (PLACEHOLDER, pending legal review)
   scoring/             scoring ruleset shapes and bands (rules: Phase 5)
-  prompts/             versioned prompt stubs + registry (no production text)
+  prompts/             versioned prompts + registry (Phase 3 drafts; none approved)
+  guardrails/          deterministic output and input rules (EN + FR)
+  ai.ts                AI limits and model prices
+  chat-copy.ts         fixed chat texts (PLACEHOLDER, pending approval)
 scripts/               migrate / seed entrypoints
-tests/                 unit and integration tests
+tests/                 unit, integration and evaluation tests
 docs/                  architecture plan, ADRs, compliance
 ```
 
@@ -155,7 +173,8 @@ docs/                  architecture plan, ADRs, compliance
 | `pnpm lint`            | ESLint                                                 |
 | `pnpm typecheck`       | `tsc --noEmit`                                         |
 | `pnpm format`          | Prettier (`format:check` in CI)                        |
-| `pnpm test`            | Vitest (unit + integration; needs Postgres)            |
+| `pnpm test`            | Vitest (unit + integration + evals; needs Postgres)    |
+| `pnpm eval`            | Agent evaluations only (`EVAL_LIVE=1` = real model)    |
 | `pnpm db:generate`     | Generate a migration from schema changes               |
 | `pnpm db:migrate`      | Apply migrations and install the queue schema          |
 | `pnpm db:seed`         | Seed the organization and owner (idempotent)           |
@@ -172,7 +191,11 @@ docs/                  architecture plan, ADRs, compliance
   database whose name does not contain `test`). Covers health, seed, auth (401/403), audit log, the
   worker runtime and the CRM: role permissions per route, cross-organization isolation, stage
   transitions, append-only history, public capture, CSV import, merge, export and erasure.
-- **AI evaluations** (`tests/evals`): arrive with the AI agent in Phase 3.
+- **AI evaluations** (`tests/evals`): the required agent cases (beginner, experienced,
+  guaranteed-profit request, personal trade advice, unknown program question, human request,
+  under-18, abusive input, prompt injection, plus invented answers and human claims). Scripted
+  by default (fixed model behaviour, run in CI); `EVAL_LIVE=1` with `ANTHROPIC_API_KEY` runs the
+  same cases against the real model with the draft prompts (costs money; run by hand).
 
 ## Domain concepts
 
@@ -247,6 +270,63 @@ copied, notes/consents/touchpoints move over, and both histories stay visible on
 
 Every staff route is scoped to the signed-in user's organization; a lead in another organization
 is reported as `404`.
+
+## AI qualification agent (Phase 3)
+
+A prospect fills in the pre-chat form on `/chat` (name, email, 18+ confirmation, optional email
+consent) and chats with the assistant. The assistant answers general questions, collects
+qualification answers and hands over to the team when it should. Deterministic code decides what
+is stored, what is sent and any stage change; the model only drafts replies and proposes tool
+calls. Details: [docs/phase-3-plan.md](docs/phase-3-plan.md).
+
+- **Turns** run in the worker (`agent.turn` job). The chat page polls for replies. A conversation
+  is leased to one worker at a time; queued messages are answered together.
+- **Gates** before any model call: lead erased/merged/lost, no 18+ confirmation, suppressed,
+  AI paused, an open flag, possible under-18 message, `AI_ENABLED`, provider configured, prompts
+  approved, per-lead daily turns and organization daily tokens. A gated turn records a `skipped`
+  AI run and no model is called.
+- **Tools** (allow-listed, Zod-validated): `get_lead_context`, `record_qualification`,
+  `update_contact`, `request_human`. Every recorded value needs a word-for-word quote found in the
+  lead's stored messages; evidence keeps the message id and character offsets, not the text.
+  Staff, form and import values are never overwritten.
+- **Guardrails** on every draft: rule filter (guarantees, risk-free, earnings, money figures,
+  trade instructions, human claims), prompt-leak check, then a model classifier. One retry; then
+  a fixed fallback reply and a flag for the team. Any unexpected error fails closed.
+- **Flags** (`human_requested`, `cannot_confirm`, `sensitive_topic`, `possible_underage`,
+  `abusive`, `guardrail_failure`, `ai_error`, `limit_reached`) pause the AI on the conversation and
+  show on the lead list ("Needs a human") and the conversation page. Staff mark them handled and
+  resume the AI.
+- **Stages**: first lead message moves `NEW_LEAD → ENGAGED`; the first qualification answer
+  recorded from the chat moves `ENGAGED → QUALIFYING`. Nothing else is automatic.
+- **AI runs**: every model call (reply and classifier) is an append-only `ai_runs` row with
+  provider, model, prompt id and version, status, tokens, cost and tool outcomes, never text.
+
+**Founder answers** (2026-10-07, business questions 1, 2, 13, 14) are in the 1.1.0 draft prompts
+and the chat copy: Canada first with no jurisdiction-specific claims, the "ProfitCosmos Omega AI
+Assistant" name and voice, AI disclosure in the first reply (checked in code), education-not-advice
+and risk statements, English/French mirroring, and the always-escalate topics. Those topics
+(refunds, cancellations, payments, discounts, complaints, disputes, legal/tax, personal advice or
+account situations, privacy, security, human requests) are also detected in code and flag the
+conversation before any model call.
+
+**Cost** (founder budget: 50 CAD/month for hosting and AI together): both model slots default to
+Claude Haiku 4.5, replies are capped at 1,000 output tokens, and the AI stops (flagging the
+conversation) when the organization reaches `AI_DAILY_TOKEN_LIMIT` tokens in a day or
+`AI_MONTHLY_BUDGET_USD` of recorded cost in a month. Every call's tokens and cost are on its
+`ai_runs` row. Rough estimate, not a quote: about 1 US cent per answered message, so the default
+monthly cap covers on the order of 1,500 replies.
+
+**Qualification and consultations**: the assistant gathers the founder's initial criteria
+(Canada location, interest, availability for a consultation; 18+ is confirmed by the pre-chat
+form), asks when something is unknown, and never says a prospect qualifies. It never proposes a
+consultation time; `config/consultations.ts` holds the schedule for Phase 6 booking. Hand-overs
+are recorded and flagged only; email notifications come in a later phase.
+
+**Go-live**: follow [docs/prompt-approval.md](docs/prompt-approval.md). Prompts and chat copy
+stay unapproved until the owner signs off there; approval does not replace legal review.
+
+**Out of scope** (later phases): knowledge base, scoring, booking, handoff workflow and
+notifications, follow-ups, analytics, other channels, multi-tenant.
 
 ## Staff authentication and roles
 

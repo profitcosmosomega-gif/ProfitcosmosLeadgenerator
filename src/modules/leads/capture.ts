@@ -16,7 +16,7 @@ export type CaptureOutcome = 'created' | 'updated' | 'suppressed';
 
 export interface CaptureInput {
   organizationId: string;
-  channel: 'form' | 'import';
+  channel: 'form' | 'import' | 'chat';
   contact: ContactInput & { email?: string | null; phone?: string | null };
   qualification?: QualificationInput;
   attribution?: AttributionInput;

@@ -6,6 +6,7 @@ import { getDb } from '@/db/client';
 import { requirePageUser } from '@/lib/admin-session';
 import { AppError } from '@/lib/errors';
 import { hasRole } from '@/lib/rbac';
+import { listLeadConversations } from '@/modules/conversations/service';
 import { getLeadDetail, getTimeline } from '@/modules/leads/service';
 import { listStaff } from '@/modules/staff/service';
 import {
@@ -32,9 +33,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     if (error instanceof AppError && error.code === 'NOT_FOUND') notFound();
     throw error;
   }
-  const [timeline, staff] = await Promise.all([
+  const [timeline, staff, chats] = await Promise.all([
     getTimeline(db, user.organizationId, id),
     listStaff(db, user.organizationId),
+    listLeadConversations(db, user.organizationId, id),
   ]);
   const { lead, qualification } = detail;
   const canEdit = hasRole(user.role, 'sales') && !lead.erasedAt && !lead.mergedIntoLeadId;
@@ -93,6 +95,34 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                 reasonForTraining: qualification?.reasonForTraining ?? '',
               }}
             />
+          </Card>
+
+          <Card title="Conversations">
+            {chats.length === 0 ? (
+              <p className="text-sm text-slate-500">No conversations.</p>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {chats.map((chat) => (
+                  <li key={chat.id} className="flex flex-wrap items-center gap-x-3">
+                    <Link
+                      className="font-medium text-brand"
+                      href={`/admin/conversations/${chat.id}`}
+                    >
+                      {chat.channel} chat · {formatDate(chat.createdAt)}
+                    </Link>
+                    <span className="text-slate-500">
+                      {chat.messageCount} messages · {chat.status}
+                      {chat.aiPaused ? ' · AI paused' : ''}
+                    </span>
+                    {chat.openEscalations > 0 ? (
+                      <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                        needs a human
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
 
           <Card title="Timeline">

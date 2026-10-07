@@ -8,6 +8,7 @@ import { TEST_ENV } from '../test-env';
 export async function resetDb(): Promise<void> {
   await getDb().execute(
     sql`truncate table
+      conversation_escalations, messages, ai_runs, conversations,
       lead_imports, channel_identities, touchpoints, suppression_list, consents, lead_notes,
       stage_transitions, lead_events, lead_qualification, leads,
       audit_log, verifications, accounts, sessions, users, organizations cascade`,

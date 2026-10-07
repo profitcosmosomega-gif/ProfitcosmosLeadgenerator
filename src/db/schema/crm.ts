@@ -32,11 +32,11 @@ export const experienceLevel = pgEnum('experience_level', [
 ]);
 export const desiredStart = pgEnum('desired_start', ['unknown', 'now', '30d', '90d', 'later']);
 export const mentorshipInterest = pgEnum('mentorship_interest', ['unknown', 'yes', 'maybe', 'no']);
-export const actorType = pgEnum('actor_type', ['user', 'system', 'lead']);
+export const actorType = pgEnum('actor_type', ['user', 'system', 'lead', 'ai']);
 export const consentChannel = pgEnum('consent_channel', ['email', 'sms', 'whatsapp', 'phone']);
 export const consentPurpose = pgEnum('consent_purpose', ['transactional', 'marketing']);
 export const consentStatus = pgEnum('consent_status', ['granted', 'revoked']);
-export const dataSource = pgEnum('data_source', ['form', 'import', 'staff']);
+export const dataSource = pgEnum('data_source', ['form', 'import', 'staff', 'chat']);
 export const suppressionKind = pgEnum('suppression_kind', ['email', 'phone']);
 export const channelKind = pgEnum('channel_kind', CHANNEL_KINDS);
 
@@ -112,15 +112,21 @@ export const leadQualification = pgTable('lead_qualification', {
   previousTraining: text(),
   desiredStart: desiredStart().notNull().default('unknown'),
   mentorshipInterest: mentorshipInterest().notNull().default('unknown'),
-  /** Provenance per field: { field: { source, actorUserId?, at } }. Never contains values. */
+  /** Provenance per field: { field: { source, actorUserId?, at, … } }. Never contains values. */
   evidence: jsonb().$type<Record<string, QualificationEvidence>>().notNull().default({}),
   updatedAt: updatedAt(),
 });
 
 export interface QualificationEvidence {
-  source: 'staff' | 'form' | 'import';
+  source: 'staff' | 'form' | 'import' | 'chat' | 'ai';
   actorUserId?: string;
   at: string;
+  /** AI only: the lead message the value was taken from and the AI run that recorded it. */
+  messageId?: string;
+  aiRunId?: string;
+  /** AI only: character range of the supporting quote inside that message (no text copied). */
+  quoteStart?: number;
+  quoteEnd?: number;
 }
 
 /** Lead timeline. Append-only. Payloads reference ids and field names — never personal data. */
