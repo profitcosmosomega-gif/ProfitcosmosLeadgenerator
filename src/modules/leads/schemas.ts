@@ -150,6 +150,8 @@ export const listLeadsQuery = z.object({
   q: z.string().trim().min(1).max(200).optional(),
   createdFrom: z.coerce.date().optional(),
   createdTo: z.coerce.date().optional(),
+  /** `open`: only leads with an open AI escalation flag. */
+  escalation: z.literal('open').optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   offset: z.coerce.number().int().min(0).max(100_000).default(0),
 });

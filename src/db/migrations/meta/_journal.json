@@ -22,6 +22,20 @@
       "when": 1791312946967,
       "tag": "0002_append_only_history",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791382556817,
+      "tag": "0003_ai_conversations",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791382791767,
+      "tag": "0004_ai_runs_append_only",
+      "breakpoints": true
     }
   ]
 }

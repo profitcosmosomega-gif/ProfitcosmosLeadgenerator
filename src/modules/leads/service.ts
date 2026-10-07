@@ -32,6 +32,12 @@ import {
 import { Errors } from '@/lib/errors';
 import { recordTouchpoint } from '@/modules/attribution/service';
 import { addToSuppressionList, currentConsents, isSuppressed } from '@/modules/consents/service';
+import {
+  eraseLeadConversations,
+  exportLeadConversations,
+  leadHasOpenEscalation,
+  moveLeadConversations,
+} from '@/modules/conversations/service';
 import { allowedNextStages, recordInitialStage } from '@/modules/crm/service';
 import { actorUserId, recordLeadHistory, type Actor } from './history';
 import { findLead, findMutableLead } from './repository';
@@ -65,6 +71,11 @@ export type ContactInput = Partial<Record<ContactField, unknown>> & {
 
 type QualificationField = keyof QualificationInput;
 type EvidenceSource = QualificationEvidence['source'];
+/** Extra provenance stored with an AI-recorded field (ids and offsets only, never text). */
+export type EvidenceDetail = Pick<
+  QualificationEvidence,
+  'messageId' | 'aiRunId' | 'quoteStart' | 'quoteEnd'
+>;
 
 // ---------------------------------------------------------------------------------------------
 // Helpers
@@ -90,12 +101,19 @@ function sameValue(a: unknown, b: unknown): boolean {
 
 /**
  * Work out which qualification fields change. With `fillOnly`, existing non-empty values are kept
- * (used for form submissions and imports, which must never overwrite staff edits).
+ * (used for form submissions, imports and the AI, which must never overwrite staff edits), unless
+ * the existing value came from one of `replaceableSources` (the AI may correct its own values).
  */
 function qualificationChanges(
   current: LeadQualification | undefined,
   input: QualificationInput,
-  options: { fillOnly: boolean; source: EvidenceSource; actor: Actor },
+  options: {
+    fillOnly: boolean;
+    source: EvidenceSource;
+    actor: Actor;
+    replaceableSources?: readonly EvidenceSource[];
+    evidenceDetails?: Partial<Record<QualificationField, EvidenceDetail>>;
+  },
 ) {
   const values: Partial<Record<QualificationField, unknown>> = {};
   const evidence: Record<string, QualificationEvidence> = { ...(current?.evidence ?? {}) };
@@ -103,11 +121,19 @@ function qualificationChanges(
   for (const [field, value] of Object.entries(input) as [QualificationField, unknown][]) {
     if (value === undefined) continue;
     const existing = current?.[field];
-    if (options.fillOnly && !isEmptyValue(existing)) continue;
+    const existingSource = current?.evidence?.[field]?.source;
+    const replaceable =
+      existingSource !== undefined && (options.replaceableSources ?? []).includes(existingSource);
+    if (options.fillOnly && !isEmptyValue(existing) && !replaceable) continue;
     if (sameValue(existing, value)) continue;
     values[field] = value;
     const actorId = actorUserId(options.actor);
-    evidence[field] = { source: options.source, at, ...(actorId ? { actorUserId: actorId } : {}) };
+    evidence[field] = {
+      source: options.source,
+      at,
+      ...(actorId ? { actorUserId: actorId } : {}),
+      ...options.evidenceDetails?.[field],
+    };
   }
   return { values, evidence, fields: Object.keys(values) };
 }
@@ -283,6 +309,9 @@ export async function applyLeadChanges(
     actor: Actor;
     eventType: string;
     eventPayload?: Record<string, unknown>;
+    /** With `fillOnly`: qualification values from these sources may still be replaced. */
+    replaceableSources?: readonly EvidenceSource[];
+    evidenceDetails?: Partial<Record<QualificationField, EvidenceDetail>>;
   },
 ): Promise<string[]> {
   const changes: Partial<Record<string, unknown>> = {};
@@ -340,6 +369,8 @@ export async function applyLeadChanges(
       fillOnly: input.fillOnly,
       source: input.source,
       actor: input.actor,
+      replaceableSources: input.replaceableSources,
+      evidenceDetails: input.evidenceDetails,
     });
     if (q.fields.length > 0) {
       await tx
@@ -405,6 +436,7 @@ export async function listLeads(db: Database, organizationId: string, query: Lis
   if (query.source) conditions.push(eq(leads.source, query.source));
   if (query.createdFrom) conditions.push(gte(leads.createdAt, query.createdFrom));
   if (query.createdTo) conditions.push(lte(leads.createdAt, query.createdTo));
+  if (query.escalation === 'open') conditions.push(leadHasOpenEscalation(leads.id));
   if (query.q) {
     const pattern = `%${escapeLike(query.q)}%`;
     conditions.push(
@@ -593,6 +625,7 @@ export async function mergeLeads(
     for (const table of [touchpoints, consents, leadNotes, channelIdentities]) {
       await tx.update(table).set({ leadId: target.id }).where(eq(table.leadId, source.id));
     }
+    await moveLeadConversations(tx, organizationId, source.id, target.id);
 
     await applyLeadChanges(tx, target, {
       contact: {
@@ -652,7 +685,7 @@ export async function mergeLeads(
 /** Everything stored about one lead, for a data-subject access request. */
 export async function exportLead(db: Database, organizationId: string, leadId: string) {
   const detail = await getLeadDetail(db, organizationId, leadId);
-  const [allConsents, transitions, timeline, identities] = await Promise.all([
+  const [allConsents, transitions, timeline, identities, leadConversations] = await Promise.all([
     db.select().from(consents).where(eq(consents.leadId, leadId)).orderBy(asc(consents.createdAt)),
     db
       .select()
@@ -661,6 +694,7 @@ export async function exportLead(db: Database, organizationId: string, leadId: s
       .orderBy(asc(stageTransitions.createdAt)),
     getTimeline(db, organizationId, leadId),
     db.select().from(channelIdentities).where(eq(channelIdentities.leadId, leadId)),
+    exportLeadConversations(db, organizationId, leadId),
   ]);
   return {
     exportedAt: new Date().toISOString(),
@@ -672,6 +706,7 @@ export async function exportLead(db: Database, organizationId: string, leadId: s
     channelIdentities: identities,
     stageHistory: transitions,
     timeline,
+    conversations: leadConversations,
   };
 }
 
@@ -719,6 +754,7 @@ export async function eraseLead(
       .update(touchpoints)
       .set({ landingPage: null, referrer: null, clickIds: {} })
       .where(eq(touchpoints.leadId, lead.id));
+    await eraseLeadConversations(tx, organizationId, lead.id);
     await recordLeadHistory(tx, {
       organizationId,
       leadId: lead.id,

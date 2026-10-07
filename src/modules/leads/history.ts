@@ -2,11 +2,15 @@ import type { DbExecutor } from '@/db/client';
 import { leadEvents } from '@/db/schema';
 import { recordAudit } from '@/modules/audit/service';
 
-/** Who performed an action. `lead` = the prospect themself (e.g. submitting a form). */
+/**
+ * Who performed an action. `lead` = the prospect themself (e.g. submitting a form);
+ * `ai` = the qualification agent, through the tools the turn pipeline accepted.
+ */
 export type Actor =
   | { type: 'user'; userId: string; requestId?: string }
   | { type: 'system'; requestId?: string }
-  | { type: 'lead'; requestId?: string };
+  | { type: 'lead'; requestId?: string }
+  | { type: 'ai'; aiRunId?: string; requestId?: string };
 
 export const systemActor: Actor = { type: 'system' };
 
@@ -45,7 +49,7 @@ export async function recordLeadHistory(
     action: input.type,
     entityType: 'lead',
     entityId: input.leadId,
-    metadata: payload,
+    metadata: input.actor.type === 'ai' ? { ...payload, actor: 'ai' } : payload,
     requestId: input.actor.requestId ?? null,
   });
 }
