@@ -56,6 +56,25 @@ describe('leak check', () => {
     expect(checkLeak(`here: ${PROMPT_CANARY}`, system)).toEqual(['leak:canary']);
     expect(checkLeak(`Sure! ${system.slice(5, 90)}`, system)).toEqual(['leak:prompt_overlap']);
   });
+  it('ignores required public wording and quoted sample replies from the prompt', () => {
+    const prompt =
+      'These internal rules describe how the assistant must behave in every chat. In your first reply say that you share educational information, not personalized financial advice. ' +
+      'Price objection sample: « Je comprends. Je ne peux pas parler des prix ici, mais un membre de l’équipe pourra vous expliquer les options. »';
+    expect(
+      checkLeak(
+        "I'm the ProfitCosmos Omega AI Assistant: I share educational information, not personalized financial advice.",
+        prompt,
+      ),
+    ).toEqual([]);
+    expect(
+      checkLeak(
+        'Je comprends. Je ne peux pas parler des prix ici, mais un membre de l’équipe pourra vous expliquer les options.',
+        prompt,
+      ),
+    ).toEqual([]);
+    expect(checkLeak(`Ok: ${prompt.slice(0, 80)}`, prompt)).toEqual(['leak:prompt_overlap']);
+  });
+
   it('ignores ordinary replies', () => {
     expect(checkLeak('I am the assistant for the academy.', system)).toEqual([]);
   });

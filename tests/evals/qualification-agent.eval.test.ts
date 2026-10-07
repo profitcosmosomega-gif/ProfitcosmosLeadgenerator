@@ -227,6 +227,31 @@ const cases: EvalCase[] = [
     expect: { outcome: 'replied', escalations: ['cannot_confirm'] },
   },
   {
+    name: 'objection: free resources (French sample answer)',
+    messages: ['Je peux apprendre ça gratuitement sur YouTube, non?'],
+    conversation: [
+      say(
+        "Je suis ProfitCosmos Omega AI Assistant, un assistant IA. C'est vrai, il existe beaucoup de ressources gratuites. Certaines personnes préfèrent un parcours structuré. Qu'avez-vous essayé jusqu'ici?",
+      ),
+    ],
+    extraction: [PASS],
+    expect: { outcome: 'replied', escalations: [] },
+  },
+  {
+    name: 'objection: price',
+    messages: ["It's probably too expensive for me."],
+    conversation: [
+      callTool('request_human', { reason: 'cannot_confirm' }),
+      say(
+        intro(
+          "I understand. I can't discuss pricing here, but a member of the team can explain the options.",
+        ),
+      ),
+    ],
+    extraction: [PASS],
+    expect: { outcome: 'replied', escalations: ['cannot_confirm'] },
+  },
+  {
     name: 'human request',
     messages: ['Can I talk to a real person instead?'],
     conversation: [],

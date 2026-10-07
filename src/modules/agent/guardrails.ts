@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import {
   escalationTopicRules,
+  PUBLIC_PROMPT_PHRASES,
   injectionRule,
   matchRule,
   outputRules,
@@ -39,10 +40,17 @@ function normalizeForOverlap(text: string): string {
 export function checkLeak(text: string, systemPrompt: string, canary = PROMPT_CANARY): string[] {
   if (text.includes(canary)) return ['leak:canary'];
   const reply = normalizeForOverlap(text);
-  const prompt = normalizeForOverlap(systemPrompt);
+  // Sample replies (« … ») and required public wording are meant to be said; they split the
+  // prompt so no window spans them.
+  let prompt = normalizeForOverlap(systemPrompt.replace(/«[^»]*»/g, '\u0000'));
+  for (const phrase of PUBLIC_PROMPT_PHRASES) {
+    prompt = prompt.split(normalizeForOverlap(phrase)).join('\u0000');
+  }
   const window = 60;
-  for (let i = 0; i + window <= prompt.length; i += 20) {
-    if (reply.includes(prompt.slice(i, i + window))) return ['leak:prompt_overlap'];
+  for (const part of prompt.split('\u0000')) {
+    for (let i = 0; i + window <= part.length; i += 20) {
+      if (reply.includes(part.slice(i, i + window))) return ['leak:prompt_overlap'];
+    }
   }
   return [];
 }

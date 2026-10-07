@@ -312,3 +312,7 @@ Deviations from the plan above:
     field is added for availability (the team reads it in the transcript). The consultation
     schedule lives in `config/consultations.ts` for Phase 6; nothing is booked. Hand-overs are
     recorded and flagged only (no email).
+14. **Objection answers** (question 12): drafted in English and French in the
+    `qualification-agent@1.1.0` draft ("Common objections": price, time, "does it work", free
+    resources, past losses, needs to think, not ready). No figures, no promises; price objections
+    hand over with `cannot_confirm`. Part of the same founder approval.

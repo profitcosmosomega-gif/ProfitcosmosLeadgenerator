@@ -91,6 +91,21 @@ export const outputRules: readonly GuardrailRule[] = [
   },
 ];
 
+/**
+ * Wording the prompt asks the assistant to say to prospects (disclosure, risk statement,
+ * hand-over). The leak check ignores these phrases, and sample replies quoted in « » in the
+ * prompt, so repeating them is not treated as disclosing the prompt.
+ */
+export const PUBLIC_PROMPT_PHRASES: readonly string[] = [
+  'ProfitCosmos Omega AI Assistant',
+  'educational information, not personalized financial advice',
+  'trading involves risk and results are not guaranteed',
+  'trading involves risk',
+  'results are not guaranteed',
+  'a member of the team will follow up',
+  'a member of the team can follow up to arrange a consultation',
+];
+
 export const INPUT_RULES_VERSION = '1.0.0';
 
 /** The lead says they are under 18: the AI stops and staff are flagged before any model call. */
