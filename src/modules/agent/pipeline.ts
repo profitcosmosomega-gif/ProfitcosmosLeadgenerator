@@ -471,10 +471,7 @@ async function processTurn(
   });
 
   if (outcome.qualificationFields.length > 0) {
-    await applyStageRule(db, organizationId, lead.id, 'ENGAGED', {
-      to: 'QUALIFYING',
-      reason: 'First qualification answer recorded from chat',
-    });
+    await applyStageRule(db, organizationId, lead.id, 'firstAnswer');
   }
 
   return {

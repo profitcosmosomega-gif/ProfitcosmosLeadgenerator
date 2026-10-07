@@ -1,7 +1,9 @@
 # Phase 3 plan — AI qualification agent
 
-> Status: **PROPOSAL — awaiting owner review** (Issue #4). No implementation code yet. Once this
-> plan is approved, implementation lands as focused commits on the same draft PR.
+> Status: **IMPLEMENTED on the draft PR** (Issue #4), plan approved by the owner for
+> implementation. **Production prompt approval is not granted**: both prompts stay
+> `status: draft` and the AI answers no one until they are approved (§13). Differences between
+> this plan and the code are listed in §15.
 
 ## 1. Goal
 
@@ -249,3 +251,46 @@ Answer by number; anything left unanswered uses the default.
 4. **Under-18 mid-chat**: flag for staff (default) or move to `LOST` automatically?
 5. **Automatic stages** limited to `ENGAGED` and `QUALIFYING` (§4)? (Default: yes.)
 6. **Limits** in §8. (Default: as listed.)
+
+## 15. Implementation notes and deviations
+
+Owner implementation gates (review on the PR) and where they are enforced:
+
+| Gate                                                                | Where                                                                                                                                                                                     |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prompts stay `draft` until approval                                 | `config/prompts/*/v1.0.0.md`; `loadActivePrompt` refuses drafts outside `NODE_ENV=test`; unit test asserts no prompt is approved                                                          |
+| Staff/form/import values never overwritten; quotes verified         | `executeTool` (protected sources), `applyLeadChanges` (`fillOnly`, `replaceableSources: ['ai']`); quotes located in the lead's stored messages, evidence keeps message id + offsets       |
+| Every guardrail/classifier call is an `ai_run`; no prompt/tool text | `generateReply` and `runClassifier` record a row per call, including failures; rows hold codes and counts only; append-only trigger; log redaction for text, prompt and token keys        |
+| Fail closed                                                         | Adapter errors, refusals, cut-off replies, classifier errors or invalid verdicts, prompt-loader errors, malformed usage/cost and tool errors all end in no AI text sent (fallback + flag) |
+| Conversation tokens scoped and never logged                         | 32 random bytes, SHA-256 hash stored, compared in constant time with the conversation and organization; wrong token = 404; `accessToken`/`authorization` redacted from logs               |
+| Stage rules limited to `NEW_LEAD→ENGAGED` and `ENGAGED→QUALIFYING`  | `STAGE_RULES` (the only two rules `applyStageRule` accepts), via `transitionLead`                                                                                                         |
+
+Deviations from the plan above:
+
+1. **Evidence**: stores the message id and the quote's character offsets in that message, not
+   the quote text, so evidence never holds a copy of personal data (erasure clears the message).
+2. **Turn scheduling**: one `agent.turn` job per conversation with a short lease
+   (`processing_until`) instead of a pg-boss singleton key. A turn answers all queued lead
+   messages together; a second worker gets "busy" and the job retries. Sending a message returns
+   `201` with the message id.
+3. **Model context**: no name at all is sent, only the transcript, what was collected in this chat,
+   and the _names_ of fields known from other sources (values withheld, since the chat visitor
+   may not be the person on file).
+4. **Conversation status**: `active` / `closed`; pausing is the `ai_paused` flag.
+5. **Escalation reasons** add `ai_error` and `limit_reached`. Any flag pauses the AI on the
+   conversation; resolving a flag does not resume it.
+6. **Timeline events**: `conversation.started`, `message.received`, `ai.replied`,
+   `lead.ai_recorded`, `escalation.flagged`, `escalation.resolved`, `conversation.ai_paused`,
+   `conversation.ai_resumed`. Blocked drafts are kept as `blocked` messages for staff review
+   instead of an `ai.blocked` event; drafts that may disclose internal instructions (leak check
+   or classifier) are stored without text.
+7. **Rate limits**: 10 messages per minute per conversation and 60 requests per minute per IP
+   (sending and polling), in-memory like the Phase 2 form limiter.
+8. **Classifier** also flags claims to be human and other unsafe content; a reply rewritten after
+   an unsupported-claim verdict still raises `cannot_confirm`.
+9. **Model refusal** (`refusal` stop reason) is treated as an error: fallback reply and `ai_error`
+   flag, no retry.
+10. **Live evals** are not wired into CI (no API key secret exists); run `EVAL_LIVE=1 pnpm eval`
+    by hand before asking for prompt approval.
+11. **Chat page** shows the "team will follow up" notice whenever the assistant is not available
+    (AI off, prompts not approved, paused or flagged).

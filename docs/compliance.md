@@ -79,3 +79,23 @@ prompt loader that refuses any prompt not marked `approved` (all prompts are stu
   strings; `lead_events` and `stage_transitions` are append-only at database level.
 - Nothing is sent to leads yet: consent is recorded, but no outbound messaging exists until
   Phase 8, where consent and suppression will be checked at send time.
+
+**Phase 3** (AI qualification agent):
+
+- The assistant says it is an AI (chat page disclosure; persona text pending business question 13)
+  and never claims to be a person (rule filter + classifier).
+- Every draft reply passes a rule filter (guarantees, risk-free, earnings claims, money figures,
+  trade instructions, human claims; English and French), a prompt-leak check and a model
+  classifier (personalised advice, guarantees, unsupported claims, internal disclosure). Failing
+  drafts are never sent; after one retry a fixed fallback is sent and the team is flagged.
+- Program, price and policy questions the assistant cannot confirm are flagged for the team
+  (`cannot_confirm`).
+- A message suggesting the person is under 18 stops the AI and flags the team before any model
+  call. The pre-chat form requires the 18+ confirmation.
+- Prompts are drafts until the owner approves them; the loader refuses drafts outside tests. ⚠️
+  The fixed chat texts (`config/chat-copy.ts`) are placeholders stored as `approved: false`.
+- No message text, prompt text or token is logged; AI runs and timeline events store ids, codes
+  and counts only. Drafts that may disclose internal instructions are not stored.
+- Erasure removes message text and closes the lead's conversations; export includes them.
+- The model receives the transcript, the names (not values) of details known from other sources
+  and what was collected in this chat; never other leads' data, emails or phone numbers.

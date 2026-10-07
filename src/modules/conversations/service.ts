@@ -163,26 +163,33 @@ export async function addLeadMessage(
     return inserted!;
   });
 
-  await applyStageRule(db, conversation.organizationId, conversation.leadId, 'NEW_LEAD', {
-    to: 'ENGAGED',
-    reason: 'First chat message received',
-  });
+  await applyStageRule(db, conversation.organizationId, conversation.leadId, 'firstMessage');
   return message;
 }
 
+/** The only automatic stage changes in Phase 3 (owner gate 6). */
+export const STAGE_RULES = {
+  firstMessage: { from: 'NEW_LEAD', to: 'ENGAGED', reason: 'First chat message received' },
+  firstAnswer: {
+    from: 'ENGAGED',
+    to: 'QUALIFYING',
+    reason: 'First qualification answer recorded from chat',
+  },
+} as const;
+
 /**
- * Deterministic Phase 3 stage rules. Moves the lead only if it is still exactly in `from`;
- * a lead moved meanwhile (by staff or a concurrent turn) is left alone.
+ * Apply a Phase 3 stage rule. Moves the lead only if it is still exactly in the rule's `from`
+ * stage; a lead moved meanwhile (by staff or a concurrent turn) is left alone.
  */
 export async function applyStageRule(
   db: Database,
   organizationId: string,
   leadId: string,
-  from: 'NEW_LEAD' | 'ENGAGED',
-  rule: { to: 'ENGAGED' | 'QUALIFYING'; reason: string },
+  name: keyof typeof STAGE_RULES,
 ): Promise<boolean> {
+  const rule = STAGE_RULES[name];
   const lead = await findLead(db, organizationId, leadId);
-  if (lead.stage !== from || lead.erasedAt || lead.mergedIntoLeadId) return false;
+  if (lead.stage !== rule.from || lead.erasedAt || lead.mergedIntoLeadId) return false;
   try {
     await transitionLead(db, {
       organizationId,

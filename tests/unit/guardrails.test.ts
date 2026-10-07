@@ -27,6 +27,8 @@ describe('output rules', () => {
     ['Je vous conseille d’acheter maintenant.', 'rule:trade_instruction'],
     ["I'm a real person, not a bot.", 'rule:human_claim'],
     ['Je ne suis pas une IA.', 'rule:human_claim'],
+    ["No, I'm a real person on the team.", 'rule:human_claim'],
+    ['No, profits are guaranteed here.', 'rule:guarantee'],
   ])('blocks %s', (text, code) => {
     expect(checkOutputRules(text)).toContain(code);
   });

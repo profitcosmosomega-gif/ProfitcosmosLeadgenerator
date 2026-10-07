@@ -82,7 +82,6 @@ export const outputRules: readonly GuardrailRule[] = [
   {
     code: 'human_claim',
     description: 'Claiming to be a person',
-    negatable: 'before',
     patterns: [
       /\b(?:i\s+am|i(?:'|’)m)\s+(?:a\s+)?(?:real\s+)?(?:human|person)\b/i,
       /\b(?:i\s+am|i(?:'|’)m)\s+not\s+an?\s+(?:ai|bot|robot|assistant)\b/i,
@@ -124,7 +123,7 @@ export const injectionRule: GuardrailRule = {
 };
 
 const NEGATION =
-  /\b(?:not|never|no|cannot|can(?:'|’)t|won(?:'|’)t|don(?:'|’)t|doesn(?:'|’)t|isn(?:'|’)t|aren(?:'|’)t|nobody|no\s+one|nothing|ne|n(?:'|’)|pas|jamais|aucun|aucune|personne\s+ne)\b/i;
+  /\b(?:not|never|no(?!\s*[,.!])|cannot|can(?:'|’)t|won(?:'|’)t|don(?:'|’)t|doesn(?:'|’)t|isn(?:'|’)t|aren(?:'|’)t|nobody|no\s+one|nothing|ne|n(?:'|’)|pas|jamais|aucun|aucune|personne\s+ne)\b/i;
 
 /** Text from the start of the sentence containing `index` up to `index`. */
 function sentenceBefore(text: string, index: number): string {

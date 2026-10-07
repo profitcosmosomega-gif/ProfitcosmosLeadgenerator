@@ -19,6 +19,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "eval": "vitest run tests/evals",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",
