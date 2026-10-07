@@ -59,6 +59,15 @@ export default async function LeadsPage({
           placeholder="Source"
           className={`${inputClass} max-w-[10rem]`}
         />
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            name="escalation"
+            value="open"
+            defaultChecked={query.escalation === 'open'}
+          />
+          Needs a human
+        </label>
         <button className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm">
           Filter
         </button>

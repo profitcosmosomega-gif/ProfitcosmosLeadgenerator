@@ -23,6 +23,21 @@ export function costMicroUsd(model: string | null | undefined, usage: LlmUsage):
   return Math.round(micro);
 }
 
+const isCount = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < 2 ** 31;
+
+/** Token counts and cost for an `ai_runs` row. Throws on malformed usage (fail closed). */
+export function accountUsage(model: string | null | undefined, usage: LlmUsage) {
+  const counts = {
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    cacheReadTokens: usage.cacheReadTokens ?? 0,
+    cacheWriteTokens: usage.cacheWriteTokens ?? 0,
+  };
+  if (!Object.values(counts).every(isCount)) throw new Error('Invalid AI usage counts');
+  return { ...counts, costMicroUsd: costMicroUsd(model, usage) };
+}
+
 export type AiRunInput = Omit<NewAiRun, 'id' | 'createdAt'> & { id?: string };
 
 /**

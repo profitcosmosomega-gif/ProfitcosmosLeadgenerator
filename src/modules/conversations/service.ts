@@ -4,6 +4,7 @@ import {
   asc,
   desc,
   eq,
+  getTableName,
   gt,
   inArray,
   isNull,
@@ -13,6 +14,7 @@ import {
   type AnyColumn,
   type SQL,
 } from 'drizzle-orm';
+import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { aiConfig } from '@config/ai';
 import type { Database, DbExecutor } from '@/db/client';
 import {
@@ -367,7 +369,7 @@ export async function insertAiMessage(
   conversation: Conversation,
   input: {
     status: 'sent' | 'blocked';
-    body: string;
+    body: string | null;
     aiRunId: string | null;
     promptId: string | null;
     promptVersion: string | null;
@@ -482,8 +484,9 @@ export async function listLeadConversations(db: Database, organizationId: string
       aiPaused: conversations.aiPaused,
       lastMessageAt: conversations.lastMessageAt,
       createdAt: conversations.createdAt,
-      messageCount: sql<number>`(select count(*)::int from ${messages} where ${messages.conversationId} = ${conversations.id})`,
-      openEscalations: sql<number>`(select count(*)::int from ${conversationEscalations} where ${conversationEscalations.conversationId} = ${conversations.id} and ${conversationEscalations.status} = 'open')`,
+      // Correlated subqueries with explicit aliases: unqualified columns would bind to the inner table.
+      messageCount: sql<number>`(select count(*)::int from messages m where m.conversation_id = "conversations"."id")`,
+      openEscalations: sql<number>`(select count(*)::int from conversation_escalations e where e.conversation_id = "conversations"."id" and e.status = 'open')`,
     })
     .from(conversations)
     .where(and(eq(conversations.organizationId, organizationId), eq(conversations.leadId, leadId)))
@@ -652,7 +655,10 @@ export async function resolveEscalation(
 
 /** SQL condition: the lead has at least one open escalation flag (for the lead list filter). */
 export function leadHasOpenEscalation(leadIdColumn: AnyColumn): SQL {
-  return sql`exists (select 1 from ${conversationEscalations} where ${conversationEscalations.leadId} = ${leadIdColumn} and ${conversationEscalations.status} = 'open')`;
+  const column = sql.raw(
+    `"${getTableName((leadIdColumn as AnyPgColumn).table)}"."${leadIdColumn.name}"`,
+  );
+  return sql`exists (select 1 from conversation_escalations e where e.lead_id = ${column} and e.status = 'open')`;
 }
 
 // ---------------------------------------------------------------------------------------------

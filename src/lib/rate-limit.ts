@@ -46,3 +46,21 @@ export function publicFormLimiter(): RateLimiter {
   );
   return globalForLimiter.__pcPublicFormLimiter;
 }
+
+const globalLimiters = globalThis as unknown as { __pcLimiters?: Map<string, RateLimiter> };
+
+/** A process-wide limiter, created on first use. Same per-process caveat as above. */
+export function sharedLimiter(name: string, limit: number, windowMs = 60_000): RateLimiter {
+  globalLimiters.__pcLimiters ??= new Map();
+  let limiter = globalLimiters.__pcLimiters.get(name);
+  if (!limiter) {
+    limiter = new RateLimiter(limit, windowMs);
+    globalLimiters.__pcLimiters.set(name, limiter);
+  }
+  return limiter;
+}
+
+/** Clear every shared limiter (tests). */
+export function resetSharedLimiters(): void {
+  for (const limiter of globalLimiters.__pcLimiters?.values() ?? []) limiter.reset();
+}

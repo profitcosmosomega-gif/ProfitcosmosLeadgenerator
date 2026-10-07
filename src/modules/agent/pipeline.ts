@@ -40,7 +40,7 @@ import {
   PROMPT_CANARY,
 } from './guardrails';
 import {
-  costMicroUsd,
+  accountUsage,
   countLeadTurnsSince,
   organizationTokensSince,
   recordAiRun,
@@ -52,6 +52,7 @@ import {
   executeTool,
   leadContextSnapshot,
   type ToolContext,
+  type ToolOutcome,
   type TurnEffects,
 } from './tools';
 
@@ -82,6 +83,33 @@ export function defaultAgentDeps(): AgentDeps {
     aiEnabled: env.AI_ENABLED,
     dailyTokenLimit: env.AI_DAILY_TOKEN_LIMIT,
   };
+}
+
+/**
+ * Whether the assistant would currently answer in this conversation, for the chat page. The
+ * page shows the fixed "team will follow up" notice when it would not.
+ */
+export async function assistantAvailable(
+  db: Database,
+  deps: AgentDeps,
+  conversation: Conversation,
+): Promise<boolean> {
+  if (conversation.status !== 'active' || conversation.aiPaused) return false;
+  if (!deps.aiEnabled || !deps.llm?.modelFor('conversation') || !deps.llm.modelFor('extraction')) {
+    return false;
+  }
+  try {
+    await deps.loadPrompt(AGENT_PROMPT_ID);
+    await deps.loadPrompt(GUARDRAIL_PROMPT_ID);
+  } catch {
+    return false;
+  }
+  return !(await hasOpenEscalation(db, conversation.id));
+}
+
+/** Check codes meaning a draft may contain prompt or internal content. */
+export function isDisclosureFailure(code: string): boolean {
+  return code.startsWith('leak:') || code === 'classifier:internal_disclosure';
 }
 
 export type TurnOutcome = 'replied' | 'fallback' | 'silent' | 'skipped';
@@ -377,7 +405,8 @@ async function processTurn(
     for (const draft of blocked) {
       await insertAiMessage(tx, conversation, {
         status: 'blocked',
-        body: draft.text,
+        // A draft that may reproduce the system prompt is not stored, only its check codes.
+        body: draft.guardrail.failures.some(isDisclosureFailure) ? null : draft.text,
         aiRunId: draft.runId,
         promptId: prompts.agent.meta.id,
         promptVersion: prompts.agent.meta.version,
@@ -556,33 +585,41 @@ async function generateReply(
       (b): b is Extract<LlmContentBlock, { type: 'tool_use' }> => b.type === 'tool_use',
     );
     const offered = new Set(input.tools.map((t) => t.name));
-    const outcomes = toolUses.map((use) =>
-      offered.has(use.name)
-        ? executeTool(use.name, use.input, input.toolContext, input.effects)
-        : {
-            record: { name: use.name, outcome: 'unknown_tool' as const, code: 'not_offered' },
-            result: JSON.stringify({ status: 'rejected', reason: 'unknown_tool' }),
-            isError: true,
-          },
-    );
-    await recordAiRun(db, {
+    const runMeta = {
       id: runId,
       ...input.base,
-      purpose: 'turn',
-      status: 'succeeded',
+      purpose: 'turn' as const,
       provider: llm.name,
       model: response.model,
       promptId: input.prompt.meta.id,
       promptVersion: input.prompt.meta.version,
       stopReason: response.stopReason,
-      inputTokens: response.usage.inputTokens,
-      outputTokens: response.usage.outputTokens,
-      cacheReadTokens: response.usage.cacheReadTokens ?? 0,
-      cacheWriteTokens: response.usage.cacheWriteTokens ?? 0,
-      costMicroUsd: costMicroUsd(response.model, response.usage),
       latencyMs: response.latencyMs,
-      toolCalls: outcomes.map((o) => o.record),
       flags,
+    };
+    let outcomes: ToolOutcome[];
+    let usage: ReturnType<typeof accountUsage>;
+    try {
+      usage = accountUsage(response.model, response.usage);
+      outcomes = toolUses.map((use) =>
+        offered.has(use.name)
+          ? executeTool(use.name, use.input, input.toolContext, input.effects)
+          : {
+              record: { name: use.name, outcome: 'unknown_tool' as const, code: 'not_offered' },
+              result: JSON.stringify({ status: 'rejected', reason: 'unknown_tool' }),
+              isError: true,
+            },
+      );
+    } catch {
+      // Unexpected accounting or tool error: record the call without usage and stop (fail closed).
+      await recordAiRun(db, { ...runMeta, status: 'failed', errorCode: 'internal' });
+      return { error: 'internal', lastRunId: runId };
+    }
+    await recordAiRun(db, {
+      ...runMeta,
+      status: 'succeeded',
+      ...usage,
+      toolCalls: outcomes.map((o) => o.record),
     });
     lastRunId = runId;
     flags = [];
@@ -627,25 +664,30 @@ async function runClassifier(
     metadata: input.metadata,
   });
   const response = outcome.response;
-  const invalid = outcome.failures.some(
-    (f) => f === 'classifier:invalid' || f === 'classifier:error',
-  );
+  let failures = outcome.failures;
+  let errorCode = outcome.errorCode;
+  let usage: ReturnType<typeof accountUsage> | null = null;
+  if (response) {
+    try {
+      usage = accountUsage(response.model, response.usage);
+    } catch {
+      failures = ['classifier:internal'];
+      errorCode = 'internal';
+    }
+  }
+  const invalid = failures.some((f) => /^classifier:(invalid|error|internal)$/.test(f));
   await recordAiRun(db, {
     ...input.base,
     parentRunId: input.parentRunId,
     purpose: 'guardrail',
-    status: invalid ? 'failed' : outcome.failures.length ? 'blocked' : 'succeeded',
-    reason: outcome.failures.length ? outcome.failures.join(',').slice(0, 200) : null,
+    status: invalid ? 'failed' : failures.length ? 'blocked' : 'succeeded',
+    reason: failures.length ? failures.join(',').slice(0, 200) : null,
     provider: llm.name,
     model: response?.model ?? llm.modelFor('extraction'),
     promptId: input.prompt.meta.id,
     promptVersion: input.prompt.meta.version,
     stopReason: response?.stopReason ?? null,
-    inputTokens: response?.usage.inputTokens ?? 0,
-    outputTokens: response?.usage.outputTokens ?? 0,
-    cacheReadTokens: response?.usage.cacheReadTokens ?? 0,
-    cacheWriteTokens: response?.usage.cacheWriteTokens ?? 0,
-    costMicroUsd: response ? costMicroUsd(response.model, response.usage) : null,
+    ...(usage ?? {}),
     latencyMs: response?.latencyMs ?? null,
     toolCalls: response
       ? response.content
@@ -655,7 +697,7 @@ async function runClassifier(
             outcome: invalid ? ('invalid' as const) : ('accepted' as const),
           }))
       : [],
-    errorCode: outcome.errorCode,
+    errorCode,
   });
-  return outcome.failures;
+  return failures;
 }

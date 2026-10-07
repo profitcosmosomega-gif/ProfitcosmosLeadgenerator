@@ -22,4 +22,29 @@ describe('log redaction', () => {
     expect(output).not.toContain('+442079460958');
     expect(output).toContain('[REDACTED]');
   });
+
+  it('removes chat text, prompts and conversation tokens', () => {
+    const lines: string[] = [];
+    const stream = new Writable({
+      write(chunk, _enc, done) {
+        lines.push(String(chunk));
+        done();
+      },
+    });
+    const log = pino({ redact: { paths: REDACT_PATHS, censor: '[REDACTED]' } }, stream);
+    log.info(
+      {
+        body: 'my secret message',
+        req: { text: 'chat text', accessToken: 'tok-123', system: 'SYSTEM PROMPT' },
+        tool: { input: { quote: 'quoted words' } },
+        conversationId: 'c-1',
+      },
+      'test',
+    );
+    const output = lines.join('');
+    for (const value of ['my secret message', 'chat text', 'tok-123', 'SYSTEM PROMPT', 'quoted']) {
+      expect(output).not.toContain(value);
+    }
+    expect(output).toContain('c-1');
+  });
 });
